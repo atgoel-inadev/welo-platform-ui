@@ -1,11 +1,8 @@
 import { useCallback, useMemo } from 'react';
-import ReactFlow, {
-  Background,
-  Controls,
-  MiniMap,
-  BackgroundVariant,
-  ConnectionMode,
-} from 'reactflow';
+import ReactFlow, { BackgroundVariant, ConnectionMode } from 'reactflow';
+import { Background } from '@reactflow/background';
+import { Controls } from '@reactflow/controls';
+import { MiniMap } from '@reactflow/minimap';
 import 'reactflow/dist/style.css';
 
 import { StartNode, QuestionNode, DecisionNode, ConditionNode, EndNode } from './nodes';
