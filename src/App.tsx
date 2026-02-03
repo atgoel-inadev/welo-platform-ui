@@ -11,7 +11,10 @@ import { ProjectsList } from './pages/ops/ProjectsList';
 import { CreateProject } from './pages/ops/CreateProject';
 import { EditProject } from './pages/ops/EditProject';
 import { WorkflowManagement } from './pages/ops/WorkflowManagement';
-import { AnnotationTask } from './pages/annotator/AnnotationTask';
+import { TaskQueue } from './pages/annotator/TaskQueue';
+import { AnnotateTask } from './pages/annotator/AnnotateTask';
+import { ReviewQueue } from './pages/reviewer/ReviewQueue';
+import { ReviewTask } from './pages/reviewer/ReviewTask';
 import { UserRole } from './types';
 
 function App() {
@@ -62,7 +65,8 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="queue" element={<div className="p-8">Review Queue - Coming Soon</div>} />
+            <Route path="queue" element={<ReviewQueue />} />
+            <Route path="task/:taskId" element={<ReviewTask />} />
             <Route path="history" element={<div className="p-8">Review History - Coming Soon</div>} />
           </Route>
 
@@ -74,8 +78,8 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="queue" element={<div className="p-8">Task Queue - Coming Soon</div>} />
-            <Route path="task" element={<AnnotationTask />} />
+            <Route path="queue" element={<TaskQueue />} />
+            <Route path="task/:taskId" element={<AnnotateTask />} />
             <Route path="history" element={<div className="p-8">Task History - Coming Soon</div>} />
             <Route path="dashboard" element={<div className="p-8">Performance Dashboard - Coming Soon</div>} />
           </Route>
