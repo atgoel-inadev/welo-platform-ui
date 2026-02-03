@@ -1,7 +1,7 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { UserRole } from '../types';
-import { Users, Briefcase, CheckSquare, FileEdit, LogOut, LayoutDashboard } from 'lucide-react';
+import { Users, Briefcase, CheckSquare, FileEdit, LogOut, LayoutDashboard, Workflow } from 'lucide-react';
 
 export const Layout = () => {
   const { user, logout } = useAuth();
@@ -26,6 +26,7 @@ export const Layout = () => {
         return [
           { to: '/ops/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
           { to: '/ops/projects', icon: Briefcase, label: 'Projects' },
+          { to: '/ops/workflows', icon: Workflow, label: 'Workflows' },
           { to: '/ops/batches', icon: FileEdit, label: 'Batches' },
         ];
       case UserRole.REVIEWER:

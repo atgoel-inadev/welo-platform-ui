@@ -11,15 +11,22 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
+    "@reactflow/background": "^11.3.14",
+    "@reactflow/controls": "^11.2.14",
+    "@reactflow/core": "^11.11.4",
+    "@reactflow/minimap": "^11.7.14",
     "@reduxjs/toolkit": "^2.11.2",
     "@supabase/supabase-js": "^2.57.4",
+    "immer": "^11.1.3",
     "lucide-react": "^0.344.0",
     "papaparse": "^5.5.3",
     "pixi.js": "^8.16.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-redux": "^9.2.0",
-    "react-router-dom": "^7.13.0"
+    "react-router-dom": "^7.13.0",
+    "reactflow": "^11.11.4",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",

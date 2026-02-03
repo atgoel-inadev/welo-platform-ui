@@ -10,6 +10,7 @@ import { OpsDashboard } from './pages/ops/OpsDashboard';
 import { ProjectsList } from './pages/ops/ProjectsList';
 import { CreateProject } from './pages/ops/CreateProject';
 import { EditProject } from './pages/ops/EditProject';
+import { WorkflowManagement } from './pages/ops/WorkflowManagement';
 import { AnnotationTask } from './pages/annotator/AnnotationTask';
 import { UserRole } from './types';
 
@@ -47,6 +48,8 @@ function App() {
             <Route path="projects/create" element={<CreateProject />} />
             <Route path="projects/:id" element={<div className="p-8">View Project - Coming Soon</div>} />
             <Route path="projects/:id/edit" element={<EditProject />} />
+            <Route path="workflows" element={<WorkflowManagement />} />
+            <Route path="workflows/:workflowId" element={<WorkflowManagement />} />
             <Route path="batches" element={<div className="p-8">Batches - Coming Soon</div>} />
             <Route path="batches/create" element={<div className="p-8">Upload Batch - Coming Soon</div>} />
           </Route>
