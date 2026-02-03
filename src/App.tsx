@@ -6,6 +6,8 @@ import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { OpsDashboard } from './pages/ops/OpsDashboard';
+import { ProjectsList } from './pages/ops/ProjectsList';
 import { UserRole } from './types';
 
 function App() {
@@ -37,9 +39,13 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="dashboard" element={<div className="p-8">Ops Dashboard - Coming Soon</div>} />
-            <Route path="projects" element={<div className="p-8">Projects - Coming Soon</div>} />
+            <Route path="dashboard" element={<OpsDashboard />} />
+            <Route path="projects" element={<ProjectsList />} />
+            <Route path="projects/create" element={<div className="p-8">Create Project - Coming Soon</div>} />
+            <Route path="projects/:id" element={<div className="p-8">View Project - Coming Soon</div>} />
+            <Route path="projects/:id/edit" element={<div className="p-8">Edit Project - Coming Soon</div>} />
             <Route path="batches" element={<div className="p-8">Batches - Coming Soon</div>} />
+            <Route path="batches/create" element={<div className="p-8">Upload Batch - Coming Soon</div>} />
           </Route>
 
           <Route
