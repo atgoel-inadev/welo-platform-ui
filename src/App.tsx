@@ -10,6 +10,7 @@ import { OpsDashboard } from './pages/ops/OpsDashboard';
 import { ProjectsList } from './pages/ops/ProjectsList';
 import { CreateProject } from './pages/ops/CreateProject';
 import { EditProject } from './pages/ops/EditProject';
+import { AnnotationTask } from './pages/annotator/AnnotationTask';
 import { UserRole } from './types';
 
 function App() {
@@ -71,6 +72,7 @@ function App() {
             }
           >
             <Route path="queue" element={<div className="p-8">Task Queue - Coming Soon</div>} />
+            <Route path="task" element={<AnnotationTask />} />
             <Route path="history" element={<div className="p-8">Task History - Coming Soon</div>} />
             <Route path="dashboard" element={<div className="p-8">Performance Dashboard - Coming Soon</div>} />
           </Route>
