@@ -8,6 +8,8 @@ import { Signup } from './pages/Signup';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { OpsDashboard } from './pages/ops/OpsDashboard';
 import { ProjectsList } from './pages/ops/ProjectsList';
+import { CreateProject } from './pages/ops/CreateProject';
+import { EditProject } from './pages/ops/EditProject';
 import { UserRole } from './types';
 
 function App() {
@@ -41,9 +43,9 @@ function App() {
           >
             <Route path="dashboard" element={<OpsDashboard />} />
             <Route path="projects" element={<ProjectsList />} />
-            <Route path="projects/create" element={<div className="p-8">Create Project - Coming Soon</div>} />
+            <Route path="projects/create" element={<CreateProject />} />
             <Route path="projects/:id" element={<div className="p-8">View Project - Coming Soon</div>} />
-            <Route path="projects/:id/edit" element={<div className="p-8">Edit Project - Coming Soon</div>} />
+            <Route path="projects/:id/edit" element={<EditProject />} />
             <Route path="batches" element={<div className="p-8">Batches - Coming Soon</div>} />
             <Route path="batches/create" element={<div className="p-8">Upload Batch - Coming Soon</div>} />
           </Route>
