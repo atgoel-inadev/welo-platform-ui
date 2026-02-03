@@ -5,7 +5,7 @@ import { UserRole } from '../types';
 
 export const useAuth = () => {
   const dispatch = useAppDispatch();
-  const { user, loading, error, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { user, loading, error, isAuthenticated, initialCheckDone } = useAppSelector((state) => state.auth);
   const hasCheckedSession = useRef(false);
 
   useEffect(() => {
@@ -38,6 +38,7 @@ export const useAuth = () => {
     loading,
     error,
     isAuthenticated,
+    initialCheckDone,
     login,
     register,
     logout,

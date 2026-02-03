@@ -8,6 +8,7 @@ interface AuthState {
   loading: boolean;
   error: string | null;
   isAuthenticated: boolean;
+  initialCheckDone: boolean;
 }
 
 const initialState: AuthState = {
@@ -16,6 +17,7 @@ const initialState: AuthState = {
   loading: false,
   error: null,
   isAuthenticated: false,
+  initialCheckDone: false,
 };
 
 export const signIn = createAsyncThunk(
@@ -93,23 +95,38 @@ export const signOut = createAsyncThunk('auth/signOut', async (_, { rejectWithVa
 
 export const checkSession = createAsyncThunk('auth/checkSession', async (_, { rejectWithValue }) => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Session check timeout')), 5000)
+    );
+
+    const sessionPromise = supabase.auth.getSession();
+
+    const { data: { session } } = await Promise.race([
+      sessionPromise,
+      timeoutPromise
+    ]) as Awaited<typeof sessionPromise>;
 
     if (!session) {
       return { user: null, session: null };
     }
 
-    const { data: userData, error: userError } = await supabase
+    const userPromise = supabase
       .from('users')
       .select('*')
       .eq('id', session.user.id)
       .maybeSingle();
+
+    const { data: userData, error: userError } = await Promise.race([
+      userPromise,
+      timeoutPromise
+    ]) as Awaited<typeof userPromise>;
 
     if (userError) throw userError;
 
     return { user: userData, session };
   } catch (error: unknown) {
     const err = error as Error;
+    console.error('Session check error:', err.message);
     return rejectWithValue(err.message);
   }
 });
@@ -162,18 +179,15 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = null;
       })
-      .addCase(checkSession.pending, (state) => {
-        state.loading = true;
-      })
       .addCase(checkSession.fulfilled, (state, action: PayloadAction<{ user: User | null; session: unknown }>) => {
-        state.loading = false;
         state.user = action.payload.user;
         state.session = action.payload.session;
         state.isAuthenticated = !!action.payload.user;
+        state.initialCheckDone = true;
       })
       .addCase(checkSession.rejected, (state) => {
-        state.loading = false;
         state.isAuthenticated = false;
+        state.initialCheckDone = true;
       });
   },
 });

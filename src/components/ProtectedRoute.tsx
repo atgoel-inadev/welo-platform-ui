@@ -8,9 +8,9 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
-  const { isAuthenticated, loading, user } = useAuth();
+  const { isAuthenticated, initialCheckDone, user } = useAuth();
 
-  if (loading) {
+  if (!initialCheckDone) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
