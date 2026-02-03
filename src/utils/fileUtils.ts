@@ -1,4 +1,4 @@
-import { FileType } from '../types/renderer';
+import { FileType } from '../types';
 
 export const getFileType = (filename: string, mimeType?: string): FileType => {
   const extension = filename.split('.').pop()?.toLowerCase();
@@ -17,12 +17,20 @@ export const getFileType = (filename: string, mimeType?: string): FileType => {
 
   switch (extension) {
     case 'txt':
-    case 'md':
-    case 'json':
       return FileType.TEXT;
+
+    case 'md':
+      return FileType.MARKDOWN;
+
+    case 'json':
+      return FileType.JSON;
 
     case 'csv':
       return FileType.CSV;
+
+    case 'html':
+    case 'htm':
+      return FileType.HTML;
 
     case 'jpg':
     case 'jpeg':
@@ -47,8 +55,11 @@ export const getFileType = (filename: string, mimeType?: string): FileType => {
     case 'mkv':
       return FileType.VIDEO;
 
+    case 'pdf':
+      return FileType.PDF;
+
     default:
-      return FileType.UNKNOWN;
+      return FileType.TEXT;
   }
 };
 

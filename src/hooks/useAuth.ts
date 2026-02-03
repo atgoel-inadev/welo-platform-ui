@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from './useRedux';
 import { signIn, signUp, signOut, checkSession } from '../store/authSlice';
 import { UserRole } from '../types';
@@ -6,9 +6,13 @@ import { UserRole } from '../types';
 export const useAuth = () => {
   const dispatch = useAppDispatch();
   const { user, loading, error, isAuthenticated } = useAppSelector((state) => state.auth);
+  const hasCheckedSession = useRef(false);
 
   useEffect(() => {
-    dispatch(checkSession());
+    if (!hasCheckedSession.current) {
+      hasCheckedSession.current = true;
+      dispatch(checkSession());
+    }
   }, [dispatch]);
 
   const login = async (email: string, password: string) => {

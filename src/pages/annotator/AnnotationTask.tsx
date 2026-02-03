@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FileViewer } from '../../components/FileViewer';
-import { FileMetadata, FileType, Annotation } from '../../types/renderer';
+import { FileMetadata, Annotation } from '../../types/renderer';
+import { FileType } from '../../types';
 import { Button } from '../../components/common';
 import { Save, SkipForward, AlertCircle } from 'lucide-react';
 

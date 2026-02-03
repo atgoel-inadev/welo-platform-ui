@@ -1,11 +1,4 @@
-export enum FileType {
-  TEXT = 'text',
-  CSV = 'csv',
-  IMAGE = 'image',
-  AUDIO = 'audio',
-  VIDEO = 'video',
-  UNKNOWN = 'unknown',
-}
+import { FileType } from './index';
 
 export interface FileMetadata {
   id: string;

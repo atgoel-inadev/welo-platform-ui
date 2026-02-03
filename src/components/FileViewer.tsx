@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { FileMetadata, FileType, Annotation, RendererConfig, BaseRenderer } from '../types/renderer';
+import { FileMetadata, Annotation, RendererConfig, BaseRenderer } from '../types/renderer';
+import { FileType } from '../types';
 import { getFileType, formatFileSize } from '../utils/fileUtils';
 import { TextRenderer } from '../renderers/TextRenderer';
 import { CSVRenderer } from '../renderers/CSVRenderer';
@@ -29,7 +30,7 @@ export const FileViewer = ({
   const rendererRef = useRef<BaseRenderer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [fileType, setFileType] = useState<FileType>(FileType.UNKNOWN);
+  const [fileType, setFileType] = useState<FileType>(FileType.TEXT);
 
   useEffect(() => {
     const detectedFileType = getFileType(file.name, file.mimeType);
@@ -61,6 +62,8 @@ export const FileViewer = ({
 
         switch (fileType) {
           case FileType.TEXT:
+          case FileType.MARKDOWN:
+          case FileType.JSON:
             renderer = new TextRenderer(containerRef.current, config);
             break;
           case FileType.CSV:
@@ -129,6 +132,8 @@ export const FileViewer = ({
   const getFileIcon = () => {
     switch (fileType) {
       case FileType.TEXT:
+      case FileType.MARKDOWN:
+      case FileType.JSON:
         return <FileText className="w-5 h-5" />;
       case FileType.CSV:
         return <FileSpreadsheet className="w-5 h-5" />;

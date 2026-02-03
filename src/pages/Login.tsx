@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { UserRole } from '../types';
@@ -6,8 +6,29 @@ import { UserRole } from '../types';
 export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, error, loading, user } = useAuth();
+  const { login, error, loading, user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      switch (user.role) {
+        case UserRole.ADMIN:
+          navigate('/admin/dashboard', { replace: true });
+          break;
+        case UserRole.PROJECT_MANAGER:
+          navigate('/ops/dashboard', { replace: true });
+          break;
+        case UserRole.REVIEWER:
+          navigate('/review/queue', { replace: true });
+          break;
+        case UserRole.ANNOTATOR:
+          navigate('/annotate/queue', { replace: true });
+          break;
+        default:
+          navigate('/', { replace: true });
+      }
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,8 +55,15 @@ export const Login = () => {
     }
   };
 
-  if (user) {
-    return null;
+  if (loading && !email) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-sky-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
