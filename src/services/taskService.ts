@@ -1,375 +1,403 @@
-import { supabase } from '../lib/supabase';
+import { taskManagementApi } from '../lib/apiClient';
+import { TaskStatus } from '../types';
 
-export interface TaskWithFiles {
+/**
+ * Backend API Response Types
+ */
+export interface BackendResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+  pagination?: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrevious: boolean;
+  };
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/**
+ * Task Interfaces
+ */
+export interface Task {
   id: string;
-  project_id: string;
-  workflow_id: string | null;
-  status: string;
+  batchId: string;
+  projectId: string;
+  workflowId: string;
+  externalId: string;
+  taskType: 'ANNOTATION' | 'REVIEW' | 'VALIDATION';
+  status: TaskStatus;
   priority: number;
-  metadata: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-  file_url?: string;
-  file_type?: string;
-  file_metadata?: Record<string, any>;
+  dueDate?: string;
+  fileType?: 'CSV' | 'TXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'PDF' | 'JSON' | 'HTML' | 'MARKDOWN';
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  fileMetadata?: any;
+  dataPayload: {
+    sourceData: any;
+    references?: any[];
+    context?: any;
+  };
+  estimatedDuration?: number;
+  actualDuration?: number;
+  requiresConsensus: boolean;
+  totalAssignmentsRequired: number;
+  completedAssignments: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Assignment {
+  id: string;
+  taskId: string;
+  userId: string;
+  workflowStage: string;
+  status: 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'EXPIRED' | 'RELEASED';
+  assignedAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  expiresAt: string;
+  assignmentMethod: 'MANUAL' | 'AUTOMATIC' | 'CLAIMED';
+  task?: Task;
 }
 
 export interface AnnotationResponse {
-  question_id: string;
-  answer: any;
-  time_spent?: number;
-  confidence?: number;
+  questionId: string;
+  response: any;
+  timeSpent?: number;
+  confidenceScore?: number;
 }
 
+export interface TaskStatistics {
+  taskId: string;
+  totalAnnotations: number;
+  completedAnnotations: number;
+  averageConfidenceScore: number;
+  averageTimeSpent: number;
+  consensusScore?: number;
+  consensusReached: boolean;
+  currentReviewLevel: number;
+  reviewsApproved: number;
+  reviewsRejected: number;
+  qualityScore?: number;
+}
+
+/**
+ * DTOs for API requests
+ */
+export interface GetNextTaskDto {
+  userId: string;
+  queueId?: string;
+  taskType?: string;
+  projectId?: string;
+}
+
+export interface SubmitTaskDto {
+  assignmentId: string;
+  annotationData: any;
+  confidenceScore?: number;
+  timeSpent?: number;
+  responses?: AnnotationResponse[];
+}
+
+export interface UpdateTaskStatusDto {
+  status: TaskStatus;
+  reason?: string;
+  metadata?: any;
+}
+
+export interface TaskFilterDto {
+  batchId?: string;
+  projectId?: string;
+  status?: TaskStatus;
+  priority?: number;
+  assignedTo?: string;
+  taskType?: string;
+  page?: number;
+  pageSize?: number;
+  sortBy?: string;
+  sortOrder?: 'ASC' | 'DESC';
+}
+
+/**
+ * Review-specific interfaces
+ */
 export interface TaskAnnotation {
-  annotation_id: string;
-  user_id: string;
-  user_name: string;
-  user_email: string;
-  responses: Record<string, any>;
-  time_spent: number;
-  submitted_at: string;
-  review_status: string | null;
-  review_feedback: string | null;
+  id: string;
+  taskId: string;
+  assignmentId: string;
+  userId: string;
+  userName?: string;
+  annotationData: any;
+  responses: AnnotationResponse[];
+  timeSpent: number;
+  confidenceScore?: number;
+  submittedAt: string;
+  reviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_REVISION';
+  reviewFeedback?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
 }
 
-export const taskService = {
-  async getMyTasks() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
+export interface ReviewSubmitDto {
+  annotationId: string;
+  decision: 'APPROVED' | 'REJECTED' | 'NEEDS_REVISION';
+  feedback?: string;
+  qualityScore?: number;
+  tags?: string[];
+}
 
-    const { data, error } = await supabase
-      .from('assignments')
-      .select(`
-        id,
-        status,
-        assigned_at,
-        started_at,
-        task:tasks (
-          id,
-          project_id,
-          workflow_id,
-          status,
-          priority,
-          metadata,
-          file:task_files (
-            file_url,
-            file_type,
-            file_metadata
-          )
-        )
-      `)
-      .eq('user_id', user.id)
-      .in('status', ['ASSIGNED', 'IN_PROGRESS'])
-      .order('assigned_at', { ascending: true });
+export interface ConsensusData {
+  taskId: string;
+  totalAnnotations: number;
+  requiredAnnotations: number;
+  consensusReached: boolean;
+  consensusScore: number;
+  agreedResponses: Record<string, any>;
+  disagreedResponses: Record<string, any[]>;
+  annotationComparison: {
+    annotationId: string;
+    userId: string;
+    responses: Record<string, any>;
+    agreement: number;
+  }[];
+}
 
-    if (error) throw error;
-    return data;
-  },
+/**
+ * Task Service
+ * Integrates with Task Management backend service (port 3003)
+ */
+export class TaskService {
+  /**
+   * Get tasks assigned to current user
+   */
+  async getMyTasks(userId: string, status?: 'ASSIGNED' | 'IN_PROGRESS'): Promise<Assignment[]> {
+    const queryParams = new URLSearchParams();
+    queryParams.append('assignedTo', userId);
+    if (status) queryParams.append('status', status);
 
-  async pullNextTask(projectId?: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
+    const url = `/tasks?${queryParams.toString()}`;
+    const response = await taskManagementApi.get<BackendResponse<Assignment[]>>(url);
+    return response.data;
+  }
 
-    const { data, error } = await supabase.rpc('pull_next_task', {
-      p_user_id: user.id,
-      p_project_id: projectId || null
-    });
-
-    if (error) throw error;
-    return data?.[0] || null;
-  },
-
-  async getTaskDetails(taskId: string) {
-    const { data: task, error: taskError } = await supabase
-      .from('tasks')
-      .select(`
-        *,
-        workflow:workflows (
-          id,
-          name,
-          flow_data,
-          status
-        ),
-        file:task_files (
-          file_url,
-          file_type,
-          file_metadata
-        ),
-        project:projects (
-          id,
-          name,
-          project_type,
-          annotation_questions
-        )
-      `)
-      .eq('id', taskId)
-      .single();
-
-    if (taskError) throw taskError;
-    return task;
-  },
-
-  async getWorkflowQuestions(workflowId: string) {
-    const { data, error } = await supabase
-      .from('workflow_nodes')
-      .select(`
-        id,
-        node_id,
-        node_type,
-        label,
-        config,
-        questions (
-          id,
-          question_type,
-          question_text,
-          options,
-          validation_rules,
-          annotation_config,
-          order_index,
-          is_required
-        )
-      `)
-      .eq('workflow_id', workflowId)
-      .eq('node_type', 'question')
-      .order('position_y', { ascending: true });
-
-    if (error) throw error;
-
-    const questions = data?.flatMap(node =>
-      (node.questions || []).map((q: any) => ({
-        ...q,
-        node_id: node.node_id,
-        node_label: node.label
-      }))
-    ) || [];
-
-    return questions.sort((a, b) => a.order_index - b.order_index);
-  },
-
-  async startTask(taskId: string, assignmentId: string) {
-    const { error: assignmentError } = await supabase
-      .from('assignments')
-      .update({
-        status: 'IN_PROGRESS',
-        started_at: new Date().toISOString()
-      })
-      .eq('id', assignmentId);
-
-    if (assignmentError) throw assignmentError;
-
-    const { error: taskError } = await supabase
-      .from('tasks')
-      .update({ status: 'IN_PROGRESS' })
-      .eq('id', taskId);
-
-    if (taskError) throw taskError;
-  },
-
-  async submitAnnotation(
-    taskId: string,
-    assignmentId: string,
-    responses: AnnotationResponse[],
-    timeSpent: number
-  ) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
-
-    const { data: annotation, error: annotationError } = await supabase
-      .from('annotations')
-      .insert({
-        task_id: taskId,
-        user_id: user.id,
-        assignment_id: assignmentId,
-        time_spent: timeSpent,
-        is_draft: false,
-        submitted_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-
-    if (annotationError) throw annotationError;
-
-    const responsesData = responses.map(r => ({
-      annotation_id: annotation.id,
-      question_id: r.question_id,
-      answer: r.answer,
-      time_spent: r.time_spent || 0,
-      confidence: r.confidence
-    }));
-
-    const { error: responsesError } = await supabase
-      .from('annotation_responses')
-      .insert(responsesData);
-
-    if (responsesError) throw responsesError;
-
-    const { error: assignmentError } = await supabase
-      .from('assignments')
-      .update({
-        status: 'SUBMITTED',
-        completed_at: new Date().toISOString()
-      })
-      .eq('id', assignmentId);
-
-    if (assignmentError) throw assignmentError;
-
-    const { error: taskError } = await supabase
-      .from('tasks')
-      .update({ status: 'PENDING_REVIEW' })
-      .eq('id', taskId);
-
-    if (taskError) throw taskError;
-
-    return annotation;
-  },
-
-  async saveDraft(
-    taskId: string,
-    assignmentId: string,
-    responses: AnnotationResponse[]
-  ) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
-
-    const { data: existingDraft } = await supabase
-      .from('annotations')
-      .select('id')
-      .eq('task_id', taskId)
-      .eq('user_id', user.id)
-      .eq('is_draft', true)
-      .maybeSingle();
-
-    if (existingDraft) {
-      await supabase
-        .from('annotation_responses')
-        .delete()
-        .eq('annotation_id', existingDraft.id);
-
-      const responsesData = responses.map(r => ({
-        annotation_id: existingDraft.id,
-        question_id: r.question_id,
-        answer: r.answer
-      }));
-
-      const { error } = await supabase
-        .from('annotation_responses')
-        .insert(responsesData);
-
-      if (error) throw error;
-      return existingDraft;
-    } else {
-      const { data: annotation, error: annotationError } = await supabase
-        .from('annotations')
-        .insert({
-          task_id: taskId,
-          user_id: user.id,
-          assignment_id: assignmentId,
-          time_spent: 0,
-          is_draft: true
-        })
-        .select()
-        .single();
-
-      if (annotationError) throw annotationError;
-
-      const responsesData = responses.map(r => ({
-        annotation_id: annotation.id,
-        question_id: r.question_id,
-        answer: r.answer
-      }));
-
-      const { error: responsesError } = await supabase
-        .from('annotation_responses')
-        .insert(responsesData);
-
-      if (responsesError) throw responsesError;
-      return annotation;
+  /**
+   * Pull next available task from queue (FIFO)
+   */
+  async pullNextTask(dto: GetNextTaskDto): Promise<Task | null> {
+    try {
+      const response = await taskManagementApi.post<BackendResponse<Task>>('/tasks/next', dto);
+      return response.data;
+    } catch (error: any) {
+      // Return null if no tasks available
+      if (error.message?.includes('No available tasks')) {
+        return null;
+      }
+      throw error;
     }
-  },
+  }
 
-  async getTaskAnnotations(taskId: string): Promise<TaskAnnotation[]> {
-    const { data, error } = await supabase.rpc('get_task_annotations_for_review', {
-      p_task_id: taskId
+  /**
+   * Get detailed task information
+   */
+  async getTaskDetails(taskId: string): Promise<Task> {
+    const response = await taskManagementApi.get<BackendResponse<Task>>(`/tasks/${taskId}`);
+    return response.data;
+  }
+
+  /**
+   * Submit task with annotation data
+   */
+  async submitTask(taskId: string, dto: SubmitTaskDto): Promise<{ success: boolean; message: string }> {
+    const response = await taskManagementApi.post<BackendResponse<any>>(`/tasks/${taskId}/submit`, dto);
+    return {
+      success: response.success,
+      message: response.message || 'Task submitted successfully',
+    };
+  }
+
+  /**
+   * Update task status (skip, hold, etc.)
+   */
+  async updateTaskStatus(taskId: string, dto: UpdateTaskStatusDto): Promise<Task> {
+    const response = await taskManagementApi.patch<BackendResponse<Task>>(`/tasks/${taskId}/status`, dto);
+    return response.data;
+  }
+
+  /**
+   * Get task statistics
+   */
+  async getTaskStatistics(taskId: string): Promise<TaskStatistics> {
+    const response = await taskManagementApi.get<BackendResponse<TaskStatistics>>(`/tasks/${taskId}/statistics`);
+    return response.data;
+  }
+
+  /**
+   * List tasks with filters
+   */
+  async listTasks(filters: TaskFilterDto): Promise<PaginatedResponse<Task>> {
+    const queryParams = new URLSearchParams();
+    
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        queryParams.append(key, value.toString());
+      }
     });
 
-    if (error) throw error;
-    return data || [];
-  },
+    const url = `/tasks?${queryParams.toString()}`;
+    const response = await taskManagementApi.get<BackendResponse<Task[]>>(url);
 
-  async submitReview(
+    return {
+      data: response.data,
+      total: response.pagination?.totalItems || 0,
+      page: response.pagination?.page || 1,
+      limit: response.pagination?.pageSize || 10,
+    };
+  }
+
+  /**
+   * Assign task to user
+   */
+  async assignTask(taskId: string, userId: string, workflowStage?: string): Promise<Assignment> {
+    const response = await taskManagementApi.post<BackendResponse<Assignment>>(`/tasks/${taskId}/assign`, {
+      userId,
+      workflowStage,
+    });
+    return response.data;
+  }
+
+  /**
+   * Get signed URL for file download
+   */
+  async getFileSignedUrl(fileId: string): Promise<{ url: string; expiresAt: string }> {
+    // TODO: Implement file service endpoint
+    // For now, files are accessed directly via fileUrl in task
+    throw new Error('File service not yet implemented - use task.fileUrl directly');
+  }
+
+  /**
+   * Skip a task with a reason
+   */
+  async skipTask(taskId: string, reason: string): Promise<Task> {
+    return this.updateTaskStatus(taskId, {
+      status: 'SKIPPED',
+      reason,
+    });
+  }
+
+  /**
+   * REVIEWER METHODS
+   */
+
+  /**
+   * Get tasks for review (tasks with status PENDING_REVIEW or REVIEW_IN_PROGRESS)
+   */
+  async getTasksForReview(userId: string, filters?: Partial<TaskFilterDto>): Promise<Task[]> {
+    const response = await taskManagementApi.get<BackendResponse<PaginatedResponse<Task>>>('/tasks', {
+      params: {
+        taskType: 'REVIEW',
+        ...filters,
+      },
+    });
+    return response.data.data;
+  }
+
+  /**
+   * Get all annotations for a specific task (for comparison/consensus)
+   */
+  async getTaskAnnotations(taskId: string): Promise<TaskAnnotation[]> {
+    const response = await taskManagementApi.get<BackendResponse<TaskAnnotation[]>>(
+      `/tasks/${taskId}/annotations`
+    );
+    return response.data;
+  }
+
+  /**
+   * Get consensus data for a task (agreement analysis between annotators)
+   */
+  async getTaskConsensus(taskId: string): Promise<ConsensusData> {
+    const response = await taskManagementApi.get<BackendResponse<ConsensusData>>(
+      `/tasks/${taskId}/consensus`
+    );
+    return response.data;
+  }
+
+  /**
+   * Submit review decision for an annotation
+   */
+  async submitReview(taskId: string, dto: ReviewSubmitDto): Promise<void> {
+    await taskManagementApi.post(`/tasks/${taskId}/review`, dto);
+  }
+
+  /**
+   * Approve an annotation
+   */
+  async approveAnnotation(
     taskId: string,
     annotationId: string,
-    status: 'APPROVED' | 'REJECTED' | 'NEEDS_REWORK',
+    feedback?: string,
+    qualityScore?: number
+  ): Promise<void> {
+    return this.submitReview(taskId, {
+      annotationId,
+      decision: 'APPROVED',
+      feedback,
+      qualityScore,
+    });
+  }
+
+  /**
+   * Reject an annotation
+   */
+  async rejectAnnotation(
+    taskId: string,
+    annotationId: string,
     feedback: string,
     qualityScore?: number
-  ) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
-
-    const { error } = await supabase
-      .from('reviews')
-      .insert({
-        task_id: taskId,
-        annotation_id: annotationId,
-        reviewer_id: user.id,
-        decision: status,
-        feedback,
-        review_level: 1
-      });
-
-    if (error) throw error;
-
-    if (status === 'APPROVED') {
-      const { error: taskError } = await supabase
-        .from('tasks')
-        .update({ status: 'APPROVED' })
-        .eq('id', taskId);
-
-      if (taskError) throw taskError;
-    } else if (status === 'REJECTED') {
-      const { error: taskError } = await supabase
-        .from('tasks')
-        .update({ status: 'REJECTED' })
-        .eq('id', taskId);
-
-      if (taskError) throw taskError;
-    }
-  },
-
-  async getTasksForReview(reviewerId: string) {
-    const { data, error } = await supabase
-      .from('tasks')
-      .select(`
-        id,
-        project_id,
-        workflow_id,
-        status,
-        priority,
-        metadata,
-        created_at,
-        updated_at,
-        file:task_files (
-          file_url,
-          file_type,
-          file_metadata
-        ),
-        project:projects (
-          id,
-          name,
-          project_type
-        ),
-        annotations:annotations (
-          id,
-          user_id,
-          submitted_at
-        )
-      `)
-      .in('status', ['PENDING_REVIEW', 'IN_REVIEW'])
-      .order('priority', { ascending: false })
-      .order('updated_at', { ascending: true });
-
-    if (error) throw error;
-    return data;
+  ): Promise<void> {
+    return this.submitReview(taskId, {
+      annotationId,
+      decision: 'REJECTED',
+      feedback,
+      qualityScore,
+    });
   }
-};
+
+  /**
+   * Request revision for an annotation
+   */
+  async requestRevision(
+    taskId: string,
+    annotationId: string,
+    feedback: string
+  ): Promise<void> {
+    return this.submitReview(taskId, {
+      annotationId,
+      decision: 'NEEDS_REVISION',
+      feedback,
+    });
+  }
+
+  /**
+   * Get task statistics including quality metrics
+   */
+  async getTaskQualityMetrics(taskId: string): Promise<TaskStatistics> {
+    const response = await taskManagementApi.get<BackendResponse<TaskStatistics>>(
+      `/tasks/${taskId}/statistics`
+    );
+    return response.data;
+  }
+}
+
+// Export singleton instance
+export const taskService = new TaskService();

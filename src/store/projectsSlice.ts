@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { supabase } from '../lib/supabase';
+import { projectService } from '../services/projectService';
 import { Project, CreateProjectInput, UpdateProjectInput, ProjectStatistics, ProjectStatus } from '../types';
 
 interface ProjectsState {
@@ -35,36 +35,20 @@ export const fetchProjects = createAsyncThunk(
   } = {}, { rejectWithValue }) => {
     try {
       const { page = 1, limit = 10, customerId, status, search } = params;
-      const from = (page - 1) * limit;
-      const to = from + limit - 1;
-
-      let query = supabase
-        .from('projects')
-        .select('*, customer:customers(*)', { count: 'exact' })
-        .range(from, to)
-        .order('created_at', { ascending: false });
-
-      if (customerId) {
-        query = query.eq('customer_id', customerId);
-      }
-
-      if (status) {
-        query = query.eq('status', status);
-      }
-
-      if (search) {
-        query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
-      }
-
-      const { data, error, count } = await query;
-
-      if (error) throw error;
-
-      return {
-        projects: data as Project[],
-        total: count || 0,
+      
+      const response = await projectService.fetchProjects({
+        customerId,
+        status,
+        search,
         page,
         limit,
+      });
+
+      return {
+        projects: response.data,
+        total: response.total,
+        page: response.page,
+        limit: response.limit,
       };
     } catch (error: unknown) {
       const err = error as Error;
@@ -77,16 +61,8 @@ export const fetchProjectById = createAsyncThunk(
   'projects/fetchProjectById',
   async (projectId: string, { rejectWithValue }) => {
     try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*, customer:customers(*)')
-        .eq('id', projectId)
-        .maybeSingle();
-
-      if (error) throw error;
-      if (!data) throw new Error('Project not found');
-
-      return data as Project;
+      const project = await projectService.fetchProjectById(projectId);
+      return project;
     } catch (error: unknown) {
       const err = error as Error;
       return rejectWithValue(err.message);
@@ -98,21 +74,8 @@ export const createProject = createAsyncThunk(
   'projects/createProject',
   async ({ input, userId }: { input: CreateProjectInput; userId: string }, { rejectWithValue }) => {
     try {
-      const { data, error } = await supabase
-        .from('projects')
-        .insert([
-          {
-            ...input,
-            created_by: userId,
-            status: 'DRAFT',
-          },
-        ])
-        .select('*, customer:customers(*)')
-        .single();
-
-      if (error) throw error;
-
-      return data as Project;
+      const project = await projectService.createProject(input, userId);
+      return project;
     } catch (error: unknown) {
       const err = error as Error;
       return rejectWithValue(err.message);
@@ -124,16 +87,8 @@ export const updateProject = createAsyncThunk(
   'projects/updateProject',
   async ({ id, input }: { id: string; input: UpdateProjectInput }, { rejectWithValue }) => {
     try {
-      const { data, error } = await supabase
-        .from('projects')
-        .update(input)
-        .eq('id', id)
-        .select('*, customer:customers(*)')
-        .single();
-
-      if (error) throw error;
-
-      return data as Project;
+      const project = await projectService.updateProject(id, input);
+      return project;
     } catch (error: unknown) {
       const err = error as Error;
       return rejectWithValue(err.message);
@@ -145,13 +100,7 @@ export const deleteProject = createAsyncThunk(
   'projects/deleteProject',
   async (projectId: string, { rejectWithValue }) => {
     try {
-      const { error } = await supabase
-        .from('projects')
-        .delete()
-        .eq('id', projectId);
-
-      if (error) throw error;
-
+      await projectService.deleteProject(projectId);
       return projectId;
     } catch (error: unknown) {
       const err = error as Error;
@@ -164,36 +113,8 @@ export const cloneProject = createAsyncThunk(
   'projects/cloneProject',
   async ({ projectId, newName, userId }: { projectId: string; newName: string; userId: string }, { rejectWithValue }) => {
     try {
-      const { data: originalProject, error: fetchError } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', projectId)
-        .single();
-
-      if (fetchError) throw fetchError;
-      if (!originalProject) throw new Error('Project not found');
-
-      const { data: clonedProject, error: createError } = await supabase
-        .from('projects')
-        .insert([
-          {
-            name: newName,
-            description: originalProject.description,
-            customer_id: originalProject.customer_id,
-            project_type: originalProject.project_type,
-            annotation_questions: originalProject.annotation_questions,
-            workflow_config: originalProject.workflow_config,
-            quality_threshold: originalProject.quality_threshold,
-            created_by: userId,
-            status: 'DRAFT',
-          },
-        ])
-        .select('*, customer:customers(*)')
-        .single();
-
-      if (createError) throw createError;
-
-      return clonedProject as Project;
+      const project = await projectService.cloneProject(projectId, newName, false);
+      return project;
     } catch (error: unknown) {
       const err = error as Error;
       return rejectWithValue(err.message);
@@ -205,12 +126,8 @@ export const fetchProjectStatistics = createAsyncThunk(
   'projects/fetchProjectStatistics',
   async (projectId: string, { rejectWithValue }) => {
     try {
-      const { data, error } = await supabase
-        .rpc('get_project_statistics', { project_id: projectId });
-
-      if (error) throw error;
-
-      return data as ProjectStatistics;
+      const stats = await projectService.getProjectStatistics(projectId);
+      return stats;
     } catch (error: unknown) {
       const err = error as Error;
       return rejectWithValue(err.message);

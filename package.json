@@ -16,7 +16,7 @@
     "@reactflow/core": "^11.11.4",
     "@reactflow/minimap": "^11.7.14",
     "@reduxjs/toolkit": "^2.11.2",
-    "@supabase/supabase-js": "^2.57.4",
+    "axios": "^1.13.4",
     "immer": "^11.1.3",
     "lucide-react": "^0.344.0",
     "papaparse": "^5.5.3",

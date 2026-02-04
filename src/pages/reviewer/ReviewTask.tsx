@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, CheckCircle, XCircle, MessageSquare, Users } from 'lucide-react';
-import { taskService, TaskAnnotation } from '../../services/taskService';
+import { taskService, Task, TaskAnnotation } from '../../services/taskService';
 import { Button } from '../../components/common/Button';
 import { FileViewer } from '../../components/FileViewer';
 
@@ -9,7 +9,7 @@ export const ReviewTask = () => {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
 
-  const [task, setTask] = useState<any>(null);
+  const [task, setTask] = useState<Task | null>(null);
   const [annotations, setAnnotations] = useState<TaskAnnotation[]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
   const [selectedAnnotation, setSelectedAnnotation] = useState<TaskAnnotation | null>(null);
@@ -17,6 +17,7 @@ export const ReviewTask = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [consensusView, setConsensusView] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (taskId) {
@@ -26,14 +27,13 @@ export const ReviewTask = () => {
 
   const loadTaskForReview = async () => {
     try {
+      setError(null);
       const taskData = await taskService.getTaskDetails(taskId!);
       setTask(taskData);
 
-      if (taskData.workflow_id) {
-        const questionsData = await taskService.getWorkflowQuestions(taskData.workflow_id);
-        setQuestions(questionsData);
-      } else if (taskData.project?.annotation_questions) {
-        setQuestions(taskData.project.annotation_questions);
+      // Get questions from dataPayload
+      if (taskData.dataPayload?.annotationQuestions) {
+        setQuestions(taskData.dataPayload.annotationQuestions);
       }
 
       const annotationsData = await taskService.getTaskAnnotations(taskId!);
@@ -41,10 +41,10 @@ export const ReviewTask = () => {
       if (annotationsData.length > 0) {
         setSelectedAnnotation(annotationsData[0]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading task for review:', error);
-      alert('Failed to load task');
-      navigate('/review/queue');
+      setError(error.response?.data?.message || 'Failed to load task');
+      setTimeout(() => navigate('/review/queue'), 2000);
     } finally {
       setLoading(false);
     }
@@ -53,17 +53,17 @@ export const ReviewTask = () => {
   const handleApprove = async (annotationId: string) => {
     setSubmitting(true);
     try {
-      await taskService.submitReview(
+      await taskService.approveAnnotation(
         taskId!,
         annotationId,
-        'APPROVED',
-        feedback
+        feedback,
+        undefined // qualityScore - optional
       );
       alert('Annotation approved successfully');
       navigate('/review/queue');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error approving annotation:', error);
-      alert('Failed to approve annotation');
+      alert(error.response?.data?.message || 'Failed to approve annotation');
     } finally {
       setSubmitting(false);
     }
@@ -77,17 +77,17 @@ export const ReviewTask = () => {
 
     setSubmitting(true);
     try {
-      await taskService.submitReview(
+      await taskService.rejectAnnotation(
         taskId!,
         annotationId,
-        'REJECTED',
-        feedback
+        feedback,
+        undefined // qualityScore - optional
       );
       alert('Annotation rejected');
       navigate('/review/queue');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error rejecting annotation:', error);
-      alert('Failed to reject annotation');
+      alert(error.response?.data?.message || 'Failed to reject annotation');
     } finally {
       setSubmitting(false);
     }
@@ -101,17 +101,16 @@ export const ReviewTask = () => {
 
     setSubmitting(true);
     try {
-      await taskService.submitReview(
+      await taskService.requestRevision(
         taskId!,
         annotationId,
-        'NEEDS_REWORK',
         feedback
       );
       alert('Revision requested');
       navigate('/review/queue');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error requesting revision:', error);
-      alert('Failed to request revision');
+      alert(error.response?.data?.message || 'Failed to request revision');
     } finally {
       setSubmitting(false);
     }
@@ -143,6 +142,17 @@ export const ReviewTask = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading task...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={() => navigate('/review/queue')}>Back to Queue</Button>
         </div>
       </div>
     );
@@ -199,11 +209,11 @@ export const ReviewTask = () => {
 
       <div className="flex-1 flex overflow-hidden">
         <div className="w-1/2 border-r border-gray-200 bg-gray-900 relative">
-          {file && (
+          {task.fileUrl && task.fileType && (
             <FileViewer
-              fileUrl={file.file_url}
-              fileType={file.file_type}
-              metadata={file.file_metadata}
+              fileUrl={task.fileUrl}
+              fileType={task.fileType}
+              metadata={task.fileMetadata}
             />
           )}
         </div>
@@ -214,15 +224,15 @@ export const ReviewTask = () => {
               <div className="flex gap-2 overflow-x-auto">
                 {annotations.map((annotation) => (
                   <button
-                    key={annotation.annotation_id}
+                    key={annotation.id}
                     onClick={() => setSelectedAnnotation(annotation)}
                     className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-                      selectedAnnotation?.annotation_id === annotation.annotation_id
+                      selectedAnnotation?.id === annotation.id
                         ? 'bg-blue-600 text-white'
                         : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
                     }`}
                   >
-                    {annotation.user_name}
+                    {annotation.userName || `User ${annotation.userId.slice(0, 8)}`}
                   </button>
                 ))}
               </div>

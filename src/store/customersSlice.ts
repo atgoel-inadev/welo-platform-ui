@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { supabase } from '../lib/supabase';
+import { projectService } from '../services/projectService';
 import { Customer } from '../types';
 
 interface CustomersState {
@@ -18,14 +18,8 @@ export const fetchCustomers = createAsyncThunk(
   'customers/fetchCustomers',
   async (_, { rejectWithValue }) => {
     try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-
-      return data as Customer[];
+      const customers = await projectService.fetchCustomers();
+      return customers;
     } catch (error: unknown) {
       const err = error as Error;
       return rejectWithValue(err.message);

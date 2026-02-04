@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { Node, Edge, Connection, addEdge, applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange } from 'reactflow';
 import { immer } from 'zustand/middleware/immer';
 import { Workflow, Question, WorkflowNode, WorkflowTransition } from '../types/workflow';
-import { supabase } from '../lib/supabase';
+import workflowService from '../services/workflowService';
 
 interface WorkflowState {
   workflows: Workflow[];
@@ -110,17 +110,11 @@ export const useWorkflowStore = create<WorkflowState>()(
       set({ isLoading: true, error: null });
 
       try {
-        let query = supabase.from('workflows').select('*');
+        const workflows = await workflowService.fetchWorkflows(
+          projectId ? { projectId } : undefined
+        );
 
-        if (projectId) {
-          query = query.eq('project_id', projectId);
-        }
-
-        const { data, error } = await query.order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        set({ workflows: data || [], isLoading: false });
+        set({ workflows, isLoading: false });
       } catch (error) {
         set({ error: (error as Error).message, isLoading: false });
       }
@@ -130,18 +124,12 @@ export const useWorkflowStore = create<WorkflowState>()(
       set({ isLoading: true, error: null });
 
       try {
-        const { data, error } = await supabase
-          .from('workflows')
-          .select('*')
-          .eq('id', workflowId)
-          .single();
-
-        if (error) throw error;
+        const workflow = await workflowService.fetchWorkflowById(workflowId);
 
         set({
-          currentWorkflow: data,
-          nodes: data.flow_data.nodes || [],
-          edges: data.flow_data.edges || [],
+          currentWorkflow: workflow,
+          nodes: workflow.flow_data.nodes || [],
+          edges: workflow.flow_data.edges || [],
           isLoading: false,
         });
       } catch (error) {
@@ -153,27 +141,21 @@ export const useWorkflowStore = create<WorkflowState>()(
       set({ isLoading: true, error: null });
 
       try {
-        const { data: userData } = await supabase.auth.getUser();
-
-        const { data, error } = await supabase
-          .from('workflows')
-          .insert({
-            ...workflow,
-            created_by: userData.user?.id,
-            flow_data: { nodes: [], edges: [] },
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
+        const newWorkflow = await workflowService.createWorkflow({
+          name: workflow.name || 'Untitled Workflow',
+          description: workflow.description,
+          projectId: workflow.project_id,
+          xstateDefinition: { nodes: [], edges: [] },
+          metadata: workflow,
+        });
 
         set((state) => {
-          state.workflows.unshift(data);
-          state.currentWorkflow = data;
+          state.workflows.unshift(newWorkflow);
+          state.currentWorkflow = newWorkflow;
           state.isLoading = false;
         });
 
-        return data;
+        return newWorkflow;
       } catch (error) {
         set({ error: (error as Error).message, isLoading: false });
         return null;
@@ -184,20 +166,15 @@ export const useWorkflowStore = create<WorkflowState>()(
       set({ isLoading: true, error: null });
 
       try {
-        const { error } = await supabase
-          .from('workflows')
-          .update(updates)
-          .eq('id', workflowId);
-
-        if (error) throw error;
+        const updatedWorkflow = await workflowService.updateWorkflow(workflowId, updates);
 
         set((state) => {
-          const workflow = state.workflows.find((w) => w.id === workflowId);
-          if (workflow) {
-            Object.assign(workflow, updates);
+          const index = state.workflows.findIndex((w) => w.id === workflowId);
+          if (index !== -1) {
+            state.workflows[index] = updatedWorkflow;
           }
           if (state.currentWorkflow?.id === workflowId) {
-            state.currentWorkflow = { ...state.currentWorkflow, ...updates };
+            state.currentWorkflow = updatedWorkflow;
           }
           state.isLoading = false;
         });
@@ -210,12 +187,7 @@ export const useWorkflowStore = create<WorkflowState>()(
       set({ isLoading: true, error: null });
 
       try {
-        const { error } = await supabase
-          .from('workflows')
-          .delete()
-          .eq('id', workflowId);
-
-        if (error) throw error;
+        await workflowService.deleteWorkflow(workflowId);
 
         set((state) => {
           state.workflows = state.workflows.filter((w) => w.id !== workflowId);
@@ -242,20 +214,20 @@ export const useWorkflowStore = create<WorkflowState>()(
       set({ isLoading: true, error: null });
 
       try {
-        const { error } = await supabase
-          .from('workflows')
-          .update({
-            flow_data: { nodes, edges },
-            version: currentWorkflow.version + 1,
-          })
-          .eq('id', currentWorkflow.id);
-
-        if (error) throw error;
+        const updatedWorkflow = await workflowService.updateWorkflow(currentWorkflow.id, {
+          xstateDefinition: { nodes, edges },
+          metadata: {
+            ...currentWorkflow.metadata,
+            version: (currentWorkflow.version || 0) + 1,
+            lastSaved: new Date().toISOString(),
+          },
+        });
 
         set((state) => {
           if (state.currentWorkflow) {
+            state.currentWorkflow = updatedWorkflow;
             state.currentWorkflow.flow_data = { nodes, edges };
-            state.currentWorkflow.version += 1;
+            state.currentWorkflow.version = (state.currentWorkflow.version || 0) + 1;
           }
           state.isLoading = false;
         });

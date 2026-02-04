@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Save, Send, Clock } from 'lucide-react';
-import { taskService, AnnotationResponse } from '../../services/taskService';
-import { supabase } from '../../lib/supabase';
+import { taskService, Task, AnnotationResponse } from '../../services/taskService';
 import { Button } from '../../components/common/Button';
 import { FileViewer } from '../../components/FileViewer';
 import { QuestionRenderer } from '../../components/annotator/QuestionRenderer';
@@ -11,7 +10,7 @@ export const AnnotateTask = () => {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
 
-  const [task, setTask] = useState<any>(null);
+  const [task, setTask] = useState<Task | null>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [responses, setResponses] = useState<Map<string, any>>(new Map());
@@ -19,7 +18,8 @@ export const AnnotateTask = () => {
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [startTime] = useState(Date.now());
-  const [assignmentId, setAssignmentId] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const userId = 'current-user-id'; // TODO: Get from auth context
 
   useEffect(() => {
     if (taskId) {
@@ -29,38 +29,26 @@ export const AnnotateTask = () => {
 
   const loadTask = async () => {
     try {
+      setError(null);
       const taskData = await taskService.getTaskDetails(taskId!);
       setTask(taskData);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { data: assignments } = await supabase
-        .from('assignments')
-        .select('id, status')
-        .eq('task_id', taskId)
-        .eq('user_id', user.id)
-        .order('assigned_at', { ascending: false })
-        .limit(1);
-
-      if (assignments && assignments.length > 0) {
-        setAssignmentId(assignments[0].id);
-
-        if (assignments[0].status === 'ASSIGNED') {
-          await taskService.startTask(taskId!, assignments[0].id);
-        }
+      // Get questions from dataPayload if available
+      if (taskData.dataPayload?.annotationQuestions) {
+        setQuestions(taskData.dataPayload.annotationQuestions);
+      } else {
+        // Fall back to a default question set
+        setQuestions([{
+          id: 'default',
+          question_text: 'Please provide your annotation',
+          question_type: 'text',
+          is_required: true
+        }]);
       }
-
-      if (taskData.workflow_id) {
-        const questionsData = await taskService.getWorkflowQuestions(taskData.workflow_id);
-        setQuestions(questionsData);
-      } else if (taskData.project?.annotation_questions) {
-        setQuestions(taskData.project.annotation_questions);
-      }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading task:', error);
-      alert('Failed to load task');
-      navigate('/annotate/queue');
+      setError(error.response?.data?.message || 'Failed to load task');
+      setTimeout(() => navigate('/annotate/queue'), 2000);
     } finally {
       setLoading(false);
     }
@@ -86,17 +74,21 @@ export const AnnotateTask = () => {
     setSaving(true);
     try {
       const responseData: AnnotationResponse[] = Array.from(responses.entries()).map(
-        ([question_id, answer]) => ({
-          question_id,
-          answer
+        ([questionId, response]) => ({
+          questionId,
+          response
         })
       );
 
-      await taskService.saveDraft(taskId!, assignmentId, responseData);
+      // Save as draft by updating task status
+      await taskService.updateTaskStatus(taskId!, {
+        status: 'IN_PROGRESS',
+        metadata: { draft: responseData }
+      });
       alert('Draft saved successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving draft:', error);
-      alert('Failed to save draft');
+      alert(error.response?.data?.message || 'Failed to save draft');
     } finally {
       setSaving(false);
     }
@@ -123,19 +115,24 @@ export const AnnotateTask = () => {
     try {
       const timeSpent = Math.floor((Date.now() - startTime) / 1000);
       const responseData: AnnotationResponse[] = Array.from(responses.entries()).map(
-        ([question_id, answer]) => ({
-          question_id,
-          answer,
-          time_spent: timeSpent / questions.length
+        ([questionId, response]) => ({
+          questionId,
+          response,
+          timeSpent: timeSpent / questions.length
         })
       );
 
-      await taskService.submitAnnotation(taskId!, assignmentId, responseData, timeSpent);
+      await taskService.submitTask(taskId!, {
+        assignmentId: userId, // TODO: Get real assignment ID
+        annotationData: Object.fromEntries(responses),
+        timeSpent,
+        responses: responseData
+      });
       alert('Annotation submitted successfully!');
       navigate('/annotate/queue');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting annotation:', error);
-      alert('Failed to submit annotation');
+      alert(error.response?.data?.message || 'Failed to submit annotation');
     } finally {
       setSubmitting(false);
     }
@@ -147,6 +144,17 @@ export const AnnotateTask = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading task...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={() => navigate('/annotate/queue')}>Back to Queue</Button>
         </div>
       </div>
     );
@@ -166,7 +174,6 @@ export const AnnotateTask = () => {
   }
 
   const currentQuestion = questions[currentQuestionIndex];
-  const file = task.file?.[0];
   const progress = Math.round(((currentQuestionIndex + 1) / questions.length) * 100);
 
   return (
@@ -220,11 +227,11 @@ export const AnnotateTask = () => {
 
       <div className="flex-1 flex overflow-hidden">
         <div className="w-1/2 border-r border-gray-200 bg-gray-900 relative">
-          {file && (
+          {task.fileUrl && task.fileType && (
             <FileViewer
-              fileUrl={file.file_url}
-              fileType={file.file_type}
-              metadata={file.file_metadata}
+              fileUrl={task.fileUrl}
+              fileType={task.fileType}
+              metadata={task.fileMetadata}
             />
           )}
         </div>

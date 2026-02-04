@@ -1,37 +1,51 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, Clock, Users, FileText } from 'lucide-react';
-import { taskService } from '../../services/taskService';
-import { supabase } from '../../lib/supabase';
+import { taskService, Task } from '../../services/taskService';
 import { Button } from '../../components/common/Button';
+import { useAppSelector } from '../../hooks/useRedux';
 
 export const ReviewQueue = () => {
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'in_review'>('pending');
   const navigate = useNavigate();
+  const { user } = useAppSelector((state) => state.auth);
+  const userId = user?.id;
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!userId) {
+      navigate('/login');
+    }
+  }, [userId, navigate]);
 
   useEffect(() => {
-    loadTasks();
-  }, [filter]);
+    if (userId) {
+      loadTasks();
+    }
+  }, [filter, userId]);
 
   const loadTasks = async () => {
+    if (!userId) return;
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      setError(null);
+      
+      const statusFilter = 
+        filter === 'pending' ? 'PENDING_REVIEW' :
+        filter === 'in_review' ? 'IN_PROGRESS' :
+        undefined;
 
-      const tasksData = await taskService.getTasksForReview(user.id);
+      const tasksData = await taskService.getTasksForReview(userId, {
+        status: statusFilter as any,
+      });
 
-      let filtered = tasksData;
-      if (filter === 'pending') {
-        filtered = tasksData.filter((t: any) => t.status === 'PENDING_REVIEW');
-      } else if (filter === 'in_review') {
-        filtered = tasksData.filter((t: any) => t.status === 'IN_REVIEW');
-      }
-
-      setTasks(filtered);
-    } catch (error) {
+      setTasks(tasksData);
+    } catch (error: any) {
       console.error('Error loading tasks:', error);
+      setError(error.response?.data?.message || 'Failed to load review tasks');
     } finally {
       setLoading(false);
     }
@@ -91,11 +105,17 @@ export const ReviewQueue = () => {
           </div>
         </div>
 
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
         {tasks.length > 0 ? (
           <div className="space-y-4">
             {tasks.map((task) => {
-              const file = task.file?.[0];
-              const annotationCount = task.annotations?.length || 0;
+              const completedCount = task.completedAssignments || 0;
+              const requiredCount = task.totalAssignmentsRequired || 1;
 
               return (
                 <div
@@ -112,39 +132,42 @@ export const ReviewQueue = () => {
                         <span className={`px-2 py-1 text-xs font-medium rounded ${
                           task.status === 'PENDING_REVIEW'
                             ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-blue-100 text-blue-700'
+                            : task.status === 'IN_PROGRESS'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-700'
                         }`}>
-                          {task.status.replace('_', ' ')}
+                          {task.status.replace(/_/g, ' ')}
                         </span>
+                        {task.fileType && (
+                          <span className="px-2 py-0.5 bg-gray-100 rounded text-xs">
+                            {task.fileType}
+                          </span>
+                        )}
                       </div>
 
-                      {task.project && (
-                        <div className="text-sm text-gray-600 mb-2">
-                          <span className="font-medium">Project:</span> {task.project.name}
-                        </div>
-                      )}
-
-                      {file && (
-                        <div className="text-sm text-gray-600 mb-3 flex items-center gap-2">
-                          <span className="px-2 py-0.5 bg-gray-100 rounded text-xs font-medium">
-                            {file.file_type}
-                          </span>
-                          <span className="truncate">{file.file_url}</span>
+                      {task.fileName && (
+                        <div className="text-sm text-gray-600 mb-3 truncate">
+                          {task.fileName}
                         </div>
                       )}
 
                       <div className="flex items-center gap-6 text-sm text-gray-500">
                         <div className="flex items-center gap-2">
                           <Users className="w-4 h-4" />
-                          <span>{annotationCount} annotation{annotationCount !== 1 ? 's' : ''}</span>
+                          <span>{completedCount}/{requiredCount} annotation{requiredCount !== 1 ? 's' : ''}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Clock className="w-4 h-4" />
-                          <span>Updated {new Date(task.updated_at).toLocaleString()}</span>
+                          <span>Updated {new Date(task.updatedAt).toLocaleString()}</span>
                         </div>
                         {task.priority > 0 && (
                           <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-medium">
                             Priority: {task.priority}
+                          </span>
+                        )}
+                        {task.requiresConsensus && (
+                          <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                            Consensus Required
                           </span>
                         )}
                       </div>

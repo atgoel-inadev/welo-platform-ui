@@ -1,10 +1,11 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { supabase } from '../lib/supabase';
-import { User, UserRole } from '../types';
+import { authService, User, UserRole, AuthResponse } from '../services/authService';
+import { authApi, projectManagementApi, taskManagementApi, workflowEngineApi } from '../lib/apiClient';
 
 interface AuthState {
   user: User | null;
-  session: unknown | null;
+  accessToken: string | null;
+  refreshToken: string | null;
   loading: boolean;
   error: string | null;
   isAuthenticated: boolean;
@@ -13,34 +14,45 @@ interface AuthState {
 
 const initialState: AuthState = {
   user: null,
-  session: null,
+  accessToken: null,
+  refreshToken: null,
   loading: false,
   error: null,
   isAuthenticated: false,
   initialCheckDone: false,
 };
 
+// Helper to set tokens in all API clients
+const setTokensInClients = (token: string) => {
+  authApi.setToken(token);
+  projectManagementApi.setToken(token);
+  taskManagementApi.setToken(token);
+  workflowEngineApi.setToken(token);
+};
+
+// Helper to clear tokens from all API clients
+const clearTokensFromClients = () => {
+  authApi.clearToken();
+  projectManagementApi.clearToken();
+  taskManagementApi.clearToken();
+  workflowEngineApi.clearToken();
+};
+
 export const signIn = createAsyncThunk(
   'auth/signIn',
   async ({ email, password }: { email: string; password: string }, { rejectWithValue }) => {
     try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (authError) throw authError;
-
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (userError) throw userError;
-      if (!userData) throw new Error('User not found in database');
-
-      return { user: userData, session: authData.session };
+      const response = await authService.login({ email, password });
+      
+      // Store tokens in localStorage
+      localStorage.setItem('accessToken', response.accessToken);
+      localStorage.setItem('refreshToken', response.refreshToken);
+      localStorage.setItem('user', JSON.stringify(response.user));
+      
+      // Set tokens in API clients
+      setTokensInClients(response.accessToken);
+      
+      return response;
     } catch (error: unknown) {
       const err = error as Error;
       return rejectWithValue(err.message);
@@ -52,30 +64,17 @@ export const signUp = createAsyncThunk(
   'auth/signUp',
   async ({ email, password, name, role = UserRole.ANNOTATOR }: { email: string; password: string; name: string; role?: UserRole }, { rejectWithValue }) => {
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Failed to create auth user');
-
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .insert([
-          {
-            id: authData.user.id,
-            email,
-            name,
-            role,
-          },
-        ])
-        .select()
-        .single();
-
-      if (userError) throw userError;
-
-      return { user: userData, session: authData.session };
+      const response = await authService.register({ email, password, name, role });
+      
+      // Store tokens in localStorage
+      localStorage.setItem('accessToken', response.accessToken);
+      localStorage.setItem('refreshToken', response.refreshToken);
+      localStorage.setItem('user', JSON.stringify(response.user));
+      
+      // Set tokens in API clients
+      setTokensInClients(response.accessToken);
+      
+      return response;
     } catch (error: unknown) {
       const err = error as Error;
       return rejectWithValue(err.message);
@@ -85,8 +84,15 @@ export const signUp = createAsyncThunk(
 
 export const signOut = createAsyncThunk('auth/signOut', async (_, { rejectWithValue }) => {
   try {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    await authService.logout();
+    
+    // Clear tokens from localStorage
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    
+    // Clear tokens from API clients
+    clearTokensFromClients();
   } catch (error: unknown) {
     const err = error as Error;
     return rejectWithValue(err.message);
@@ -95,41 +101,87 @@ export const signOut = createAsyncThunk('auth/signOut', async (_, { rejectWithVa
 
 export const checkSession = createAsyncThunk('auth/checkSession', async (_, { rejectWithValue }) => {
   try {
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Session check timeout')), 5000)
-    );
-
-    const sessionPromise = supabase.auth.getSession();
-
-    const { data: { session } } = await Promise.race([
-      sessionPromise,
-      timeoutPromise
-    ]) as Awaited<typeof sessionPromise>;
-
-    if (!session) {
-      return { user: null, session: null };
+    const accessToken = localStorage.getItem('accessToken');
+    const storedUser = localStorage.getItem('user');
+    
+    if (!accessToken || !storedUser) {
+      return { user: null, accessToken: null, refreshToken: null };
     }
-
-    const userPromise = supabase
-      .from('users')
-      .select('*')
-      .eq('id', session.user.id)
-      .maybeSingle();
-
-    const { data: userData, error: userError } = await Promise.race([
-      userPromise,
-      timeoutPromise
-    ]) as Awaited<typeof userPromise>;
-
-    if (userError) throw userError;
-
-    return { user: userData, session };
+    
+    // Set token in API clients
+    setTokensInClients(accessToken);
+    
+    // Validate session with backend
+    try {
+      const sessionData = await authService.validateSession();
+      
+      return {
+        user: sessionData.user,
+        accessToken,
+        refreshToken: localStorage.getItem('refreshToken'),
+      };
+    } catch (error) {
+      // Token might be expired, try to refresh
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken) {
+        try {
+          const response = await authService.refreshToken(refreshToken);
+          
+          // Update tokens in localStorage
+          localStorage.setItem('accessToken', response.accessToken);
+          localStorage.setItem('refreshToken', response.refreshToken);
+          localStorage.setItem('user', JSON.stringify(response.user));
+          
+          // Set new token in API clients
+          setTokensInClients(response.accessToken);
+          
+          return {
+            user: response.user,
+            accessToken: response.accessToken,
+            refreshToken: response.refreshToken,
+          };
+        } catch (refreshError) {
+          // Refresh failed, clear everything
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          clearTokensFromClients();
+          return { user: null, accessToken: null, refreshToken: null };
+        }
+      }
+      
+      return { user: null, accessToken: null, refreshToken: null };
+    }
   } catch (error: unknown) {
     const err = error as Error;
     console.error('Session check error:', err.message);
     return rejectWithValue(err.message);
   }
 });
+
+export const getCurrentUser = createAsyncThunk('auth/getCurrentUser', async (_, { rejectWithValue }) => {
+  try {
+    const user = await authService.getCurrentUser();
+    return user;
+  } catch (error: unknown) {
+    const err = error as Error;
+    return rejectWithValue(err.message);
+  }
+});
+
+export const updateProfile = createAsyncThunk(
+  'auth/updateProfile',
+  async (profileData: { name?: string; email?: string }, { rejectWithValue }) => {
+    try {
+      const user = await authService.updateProfile(profileData);
+      localStorage.setItem('user', JSON.stringify(user));
+      return user;
+    } catch (error: unknown) {
+      const err = error as Error;
+      return rejectWithValue(err.message);
+    }
+  }
+);
 
 const authSlice = createSlice({
   name: 'auth',
@@ -138,6 +190,19 @@ const authSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    setCredentials: (state, action: PayloadAction<{ user: User; accessToken: string; refreshToken: string }>) => {
+      state.user = action.payload.user;
+      state.accessToken = action.payload.accessToken;
+      state.refreshToken = action.payload.refreshToken;
+      state.isAuthenticated = true;
+    },
+    clearCredentials: (state) => {
+      state.user = null;
+      state.accessToken = null;
+      state.refreshToken = null;
+      state.isAuthenticated = false;
+      clearTokensFromClients();
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -145,10 +210,11 @@ const authSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(signIn.fulfilled, (state, action: PayloadAction<{ user: User; session: unknown }>) => {
+      .addCase(signIn.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
         state.loading = false;
         state.user = action.payload.user;
-        state.session = action.payload.session;
+        state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
         state.isAuthenticated = true;
         state.error = null;
       })
@@ -161,10 +227,11 @@ const authSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(signUp.fulfilled, (state, action: PayloadAction<{ user: User; session: unknown }>) => {
+      .addCase(signUp.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
         state.loading = false;
         state.user = action.payload.user;
-        state.session = action.payload.session;
+        state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
         state.isAuthenticated = true;
         state.error = null;
       })
@@ -174,23 +241,31 @@ const authSlice = createSlice({
       })
       .addCase(signOut.fulfilled, (state) => {
         state.user = null;
-        state.session = null;
+        state.accessToken = null;
+        state.refreshToken = null;
         state.isAuthenticated = false;
         state.loading = false;
         state.error = null;
       })
-      .addCase(checkSession.fulfilled, (state, action: PayloadAction<{ user: User | null; session: unknown }>) => {
+      .addCase(checkSession.fulfilled, (state, action: PayloadAction<{ user: User | null; accessToken: string | null; refreshToken: string | null }>) => {
         state.user = action.payload.user;
-        state.session = action.payload.session;
+        state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
         state.isAuthenticated = !!action.payload.user;
         state.initialCheckDone = true;
       })
       .addCase(checkSession.rejected, (state) => {
         state.isAuthenticated = false;
         state.initialCheckDone = true;
+      })
+      .addCase(getCurrentUser.fulfilled, (state, action: PayloadAction<User>) => {
+        state.user = action.payload;
+      })
+      .addCase(updateProfile.fulfilled, (state, action: PayloadAction<User>) => {
+        state.user = action.payload;
       });
   },
 });
 
-export const { clearError } = authSlice.actions;
+export const { clearError, setCredentials, clearCredentials } = authSlice.actions;
 export default authSlice.reducer;

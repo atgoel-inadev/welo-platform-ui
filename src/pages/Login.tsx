@@ -1,21 +1,32 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { UserRole } from '../types';
+import { UserRole } from '../services/authService';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { login, error, loading, user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Get the redirect path from location state, or default to role-based dashboard
+  const from = (location.state as any)?.from?.pathname;
 
   useEffect(() => {
     if (isAuthenticated && user) {
+      // If there's a specific redirect path, use it
+      if (from) {
+        navigate(from, { replace: true });
+        return;
+      }
+
+      // Otherwise, redirect based on role
       switch (user.role) {
         case UserRole.ADMIN:
           navigate('/admin/dashboard', { replace: true });
           break;
-        case UserRole.PROJECT_MANAGER:
+        case UserRole.OPS_MANAGER:
           navigate('/ops/dashboard', { replace: true });
           break;
         case UserRole.REVIEWER:
@@ -24,11 +35,14 @@ export const Login = () => {
         case UserRole.ANNOTATOR:
           navigate('/annotate/queue', { replace: true });
           break;
+        case UserRole.CUSTOMER:
+          navigate('/customer/dashboard', { replace: true });
+          break;
         default:
           navigate('/', { replace: true });
       }
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, navigate, from]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
