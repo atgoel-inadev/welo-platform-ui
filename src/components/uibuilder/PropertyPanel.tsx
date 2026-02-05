@@ -3,7 +3,6 @@
  * Configuration panel for selected widget properties
  */
 
-import { useState } from 'react';
 import { Trash2, Plus, X } from 'lucide-react';
 import { Widget, WidgetOption } from '../../types/uiBuilder';
 import { Button, FormInput } from '../common';
@@ -15,7 +14,7 @@ interface PropertyPanelProps {
 }
 
 export const PropertyPanel: React.FC<PropertyPanelProps> = ({ widget, onUpdate, onDelete }) => {
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  // const [showAdvanced, setShowAdvanced] = useState(false);
 
   const renderBasicProperties = () => (
     <div className="space-y-4">

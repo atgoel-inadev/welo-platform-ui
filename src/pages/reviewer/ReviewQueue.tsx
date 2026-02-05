@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Eye, Clock, FileText, Package, Filter, AlertCircle,
-  CheckCircle, Flag, Search, RefreshCw, Users
+  Flag, Search, RefreshCw, Users
 } from 'lucide-react';
 import { taskService, Task } from '../../services/taskService';
 import { Button } from '../../components/common/Button';
@@ -67,7 +67,7 @@ export const ReviewQueue = () => {
       setTasks(tasksData);
 
       // Load batch and project context
-      const projectsResponse = await projectService.fetchProjects({ status: 'ACTIVE' });
+      const projectsResponse = await projectService.fetchProjects({ status: 'ACTIVE' as any });
       const projectsMap: Record<string, Project> = {};
       (projectsResponse.data || []).forEach((project: Project) => {
         projectsMap[project.id] = project;

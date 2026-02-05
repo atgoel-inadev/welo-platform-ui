@@ -47,7 +47,7 @@ export const BatchUpload = () => {
   const loadProjects = async () => {
     setProjectsLoading(true);
     try {
-      const response = await projectService.fetchProjects({ status: 'ACTIVE' });
+      const response = await projectService.fetchProjects({ status: 'ACTIVE' as any });
       setProjects(response.data || []);
     } catch (error: any) {
       console.error('Failed to load projects:', error);

@@ -2,8 +2,13 @@ import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { UserRole } from '../types';
 import { Users, Briefcase, CheckSquare, FileEdit, LogOut, LayoutDashboard, Workflow } from 'lucide-react';
+import { ReactNode } from 'react';
 
-export const Layout = () => {
+interface LayoutProps {
+  children?: ReactNode;
+}
+
+export const Layout = ({ children }: LayoutProps = {}) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -90,7 +95,7 @@ export const Layout = () => {
       </aside>
 
       <main className="flex-1 overflow-auto">
-        <Outlet />
+        {children || <Outlet />}
       </main>
     </div>
   );

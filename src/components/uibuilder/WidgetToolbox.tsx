@@ -21,7 +21,7 @@ import {
   Type,
   List,
 } from 'lucide-react';
-import { Widget, WidgetType, WidgetDefinition } from '../../types/uiBuilder';
+import { Widget, WidgetDefinition } from '../../types/uiBuilder';
 
 interface WidgetToolboxProps {
   onAddWidget: (widget: Widget) => void;

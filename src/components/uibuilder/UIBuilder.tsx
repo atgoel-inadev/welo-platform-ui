@@ -7,10 +7,10 @@ import { useState, useReducer, useCallback } from 'react';
 import { Save, Eye, Undo, Redo, Code, Download, Upload } from 'lucide-react';
 import { Button } from '../common';
 import { UIConfiguration, UIBuilderState, UIBuilderAction, PipelineMode, Widget } from '../../types/uiBuilder';
-import { WidgetToolbox } from './WidgetToolbox';
-import { CanvasArea } from './CanvasArea';
-import { PropertyPanel } from './PropertyPanel';
-import { PreviewPanel } from './PreviewPanel';
+import { WidgetToolbox } from './WidgetToolbox.tsx';
+import { CanvasArea } from './CanvasArea.tsx';
+import { PropertyPanel } from './PropertyPanel.tsx';
+import { PreviewPanel } from './PreviewPanel.tsx';
 
 interface UIBuilderProps {
   projectId: string;
@@ -26,7 +26,7 @@ function uiBuilderReducer(state: UIBuilderState, action: UIBuilderAction): UIBui
       const newConfig = {
         ...state.configuration,
         widgets: [...state.configuration.widgets, action.widget],
-      };
+      } as UIConfiguration;
       return {
         ...state,
         configuration: newConfig,
@@ -43,13 +43,13 @@ function uiBuilderReducer(state: UIBuilderState, action: UIBuilderAction): UIBui
         widgets: state.configuration.widgets.map((w) =>
           w.id === action.widgetId ? { ...w, ...action.updates } : w
         ),
-      };
+      } as UIConfiguration;
       return {
         ...state,
         configuration: newConfig,
         selectedWidget:
           state.selectedWidget?.id === action.widgetId
-            ? { ...state.selectedWidget, ...action.updates }
+            ? ({ ...state.selectedWidget, ...action.updates } as Widget)
             : state.selectedWidget,
         isDirty: true,
         history: [...state.history.slice(0, state.historyIndex + 1), newConfig],
@@ -61,7 +61,7 @@ function uiBuilderReducer(state: UIBuilderState, action: UIBuilderAction): UIBui
       const newConfig = {
         ...state.configuration,
         widgets: state.configuration.widgets.filter((w) => w.id !== action.widgetId),
-      };
+      } as UIConfiguration;
       return {
         ...state,
         configuration: newConfig,
@@ -243,7 +243,6 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
               disabled={!canUndo}
               variant="secondary"
               size="sm"
-              title="Undo"
             >
               <Undo size={16} />
             </Button>
@@ -252,7 +251,6 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
               disabled={!canRedo}
               variant="secondary"
               size="sm"
-              title="Redo"
             >
               <Redo size={16} />
             </Button>
@@ -298,10 +296,12 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
                 onChange={handleImport}
                 className="hidden"
               />
-              <Button as="span" variant="secondary" size="sm">
-                <Upload size={16} className="mr-1" />
-                Import
-              </Button>
+              <div className="inline-block">
+                <Button variant="secondary" size="sm">
+                  <Upload size={16} className="mr-1" />
+                  Import
+                </Button>
+              </div>
             </label>
 
             <Button onClick={handleExport} variant="secondary" size="sm">
@@ -333,7 +333,7 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
         {/* Left Panel - Widget Toolbox */}
         <div className="w-64 bg-white border-r border-gray-200 overflow-y-auto">
           <WidgetToolbox
-            onAddWidget={(widget) => dispatch({ type: 'ADD_WIDGET', widget })}
+            onAddWidget={(widget: Widget) => dispatch({ type: 'ADD_WIDGET', widget })}
           />
         </div>
 
@@ -349,15 +349,15 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
             <CanvasArea
               configuration={state.configuration}
               selectedWidget={state.selectedWidget}
-              onSelectWidget={(widgetId) => dispatch({ type: 'SELECT_WIDGET', widgetId })}
-              onUpdateWidget={(widgetId, updates) =>
+              onSelectWidget={(widgetId: string | null) => dispatch({ type: 'SELECT_WIDGET', widgetId })}
+              onUpdateWidget={(widgetId: string, updates: Partial<Widget>) =>
                 dispatch({ type: 'UPDATE_WIDGET', widgetId, updates })
               }
-              onDeleteWidget={(widgetId) => dispatch({ type: 'DELETE_WIDGET', widgetId })}
-              onMoveWidget={(widgetId, position) =>
+              onDeleteWidget={(widgetId: string) => dispatch({ type: 'DELETE_WIDGET', widgetId })}
+              onMoveWidget={(widgetId: string, position: { x: number; y: number }) =>
                 dispatch({ type: 'MOVE_WIDGET', widgetId, position })
               }
-              onResizeWidget={(widgetId, size) =>
+              onResizeWidget={(widgetId: string, size: { width: number; height: number }) =>
                 dispatch({ type: 'RESIZE_WIDGET', widgetId, size })
               }
             />
@@ -377,7 +377,7 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
             <div className="w-96 bg-white border-l border-gray-200 overflow-y-auto">
               <PropertyPanel
                 widget={state.selectedWidget}
-                onUpdate={(updates) =>
+                onUpdate={(updates: Partial<Widget>) =>
                   dispatch({
                     type: 'UPDATE_WIDGET',
                     widgetId: state.selectedWidget!.id,

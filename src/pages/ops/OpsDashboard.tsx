@@ -72,7 +72,7 @@ export const OpsDashboard = () => {
                       <div>
                         <h3 className="font-medium text-gray-900">{project.name}</h3>
                         <p className="text-sm text-gray-500 mt-1">
-                          {project.project_type?.replaceAll('_', ' ') || 'N/A'}
+                          {project.project_type?.replace(/_/g, ' ') || 'N/A'}
                         </p>
                       </div>
                       <span

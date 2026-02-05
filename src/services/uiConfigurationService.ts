@@ -156,6 +156,6 @@ export const importUIConfiguration = (jsonString: string): UIConfiguration => {
     }
     return config;
   } catch (error) {
-    throw new Error(`Failed to import configuration: ${error.message}`);
+    throw new Error(`Failed to import configuration: ${(error as Error).message}`);
   }
 };

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
-  Upload,
   Users,
   CheckCircle,
   Clock,
@@ -11,12 +10,11 @@ import {
   UserPlus,
   RefreshCw,
   Download,
-  Filter,
   Search,
 } from 'lucide-react';
 import { batchService, Batch, BatchStatistics, Task } from '../../services/batchService';
-import { userService, User } from '../../services/userService';
-import { UserRole } from '../../services/authService';
+import { userService } from '../../services/userService';
+import { User } from '../../services/authService';
 
 type AssignmentMethod = 'AUTO_ROUND_ROBIN' | 'AUTO_WORKLOAD_BASED' | 'AUTO_SKILL_BASED';
 

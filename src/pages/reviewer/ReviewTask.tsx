@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import Layout from '../../components/Layout';
+import { Layout } from '../../components/Layout';
 import UnifiedTaskRenderer from '../../components/task/UnifiedTaskRenderer';
 import { useAuth } from '../../hooks/useAuth';
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, AlertCircle, Save, Send } from 'lucide-react';
-import FileViewer from '../FileViewer';
+import { Loader2, AlertCircle, Send } from 'lucide-react';
+import { FileViewer } from '../FileViewer';
 import AnnotationReviewWidget from './AnnotationReviewWidget';
 import { 
   taskRenderingService, 
@@ -82,12 +82,13 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
     }));
   };
 
-  const handleExtraWidgetChange = (widgetId: string, data: any) => {
-    setExtraWidgetData((prev) => ({
-      ...prev,
-      [widgetId]: data,
-    }));
-  };
+  // Extra widget change handler
+  // const handleExtraWidgetChange = (widgetId: string, data: any) => {
+  //   setExtraWidgetData((prev) => ({
+  //     ...prev,
+  //     [widgetId]: data,
+  //   }));
+  // };
 
   const validateAnnotationForm = (): boolean => {
     if (!config) return false;
@@ -321,7 +322,7 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
         <div className="space-y-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <h2 className="text-lg font-semibold mb-4 text-gray-900">Task Files</h2>
-            <FileViewer files={config.taskData.fileUrls} />
+            <FileViewer fileUrl={config.taskData.fileUrls[0]} />
           </div>
 
           {/* Extra widgets in left column (if configured) */}

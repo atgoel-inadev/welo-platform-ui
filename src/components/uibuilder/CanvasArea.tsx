@@ -21,10 +21,10 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
   configuration,
   selectedWidget,
   onSelectWidget,
-  onUpdateWidget,
+  onUpdateWidget: _onUpdateWidget,
   onDeleteWidget,
   onMoveWidget,
-  onResizeWidget,
+  onResizeWidget: _onResizeWidget,
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [draggingWidget, setDraggingWidget] = useState<string | null>(null);
