@@ -28,6 +28,7 @@ export const Layout = () => {
           { to: '/ops/projects', icon: Briefcase, label: 'Projects' },
           { to: '/ops/workflows', icon: Workflow, label: 'Workflows' },
           { to: '/ops/batches', icon: FileEdit, label: 'Batches' },
+          { to: '/ops/users', icon: Users, label: 'Users' },
         ];
       case UserRole.REVIEWER:
         return [

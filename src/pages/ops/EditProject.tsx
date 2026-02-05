@@ -4,6 +4,7 @@ import { Save, ArrowLeft } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks/useRedux';
 import { fetchProjectById, updateProject } from '../../store/projectsSlice';
 import { Button, FormInput, FormTextarea, FormSelect } from '../../components/common';
+import { ProjectTeamAssignment } from '../../components/common/ProjectTeamAssignment';
 import { ProjectStatus } from '../../types';
 
 export const EditProject = () => {
@@ -190,6 +191,17 @@ export const EditProject = () => {
             </Button>
           </div>
         </form>
+
+        {/* Project Team Assignment */}
+        <div className="mt-8">
+          <ProjectTeamAssignment 
+            projectId={id!} 
+            onTeamUpdated={() => {
+              // Optionally reload project data
+              dispatch(fetchProjectById(id!));
+            }}
+          />
+        </div>
       </div>
     </div>
   );

@@ -1,0 +1,11 @@
+This is a sample text document for annotation.
+
+Task: Identify the sentiment of this text.
+
+Content:
+The new product launch exceeded all expectations. Our customers are thrilled with the innovative features and improved user experience. Sales have increased by 45% in the first quarter, and customer satisfaction ratings are at an all-time high. The team worked incredibly hard to deliver this success, and it's paying off tremendously.
+
+Questions to consider:
+1. What is the overall sentiment? (Positive/Negative/Neutral)
+2. What are the key positive indicators?
+3. Are there any concerns mentioned?
