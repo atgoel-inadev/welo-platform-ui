@@ -111,7 +111,7 @@ export const deleteProject = createAsyncThunk(
 
 export const cloneProject = createAsyncThunk(
   'projects/cloneProject',
-  async ({ projectId, newName, userId }: { projectId: string; newName: string; userId: string }, { rejectWithValue }) => {
+  async ({ projectId, newName, userId: _userId }: { projectId: string; newName: string; userId: string }, { rejectWithValue }) => {
     try {
       const project = await projectService.cloneProject(projectId, newName, false);
       return project;

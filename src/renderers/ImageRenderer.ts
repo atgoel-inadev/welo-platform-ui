@@ -1,6 +1,6 @@
 import { Sprite, Texture, Graphics, Text as PixiText, TextStyle, Container } from 'pixi.js';
 import { BaseRenderer } from './BaseRenderer';
-import { FileMetadata, Annotation, RendererConfig, ZoomPanState } from '../types/renderer';
+import { FileMetadata, RendererConfig, ZoomPanState } from '../types/renderer';
 
 export class ImageRenderer extends BaseRenderer {
   private imageSprite: Sprite | null;

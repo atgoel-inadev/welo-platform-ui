@@ -1,6 +1,6 @@
 import Papa from 'papaparse';
 import { BaseRenderer } from './BaseRenderer';
-import { FileMetadata, Annotation, RendererConfig } from '../types/renderer';
+import { FileMetadata, RendererConfig } from '../types/renderer';
 
 export class CSVRenderer extends BaseRenderer {
   private tableContainer: HTMLDivElement;

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Node, Edge, Connection, addEdge, applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange } from 'reactflow';
 import { immer } from 'zustand/middleware/immer';
-import { Workflow, Question, WorkflowNode, WorkflowTransition } from '../types/workflow';
+import { Workflow } from '../types/workflow';
 import workflowService from '../services/workflowService';
 
 interface WorkflowState {
@@ -216,11 +216,6 @@ export const useWorkflowStore = create<WorkflowState>()(
       try {
         const updatedWorkflow = await workflowService.updateWorkflow(currentWorkflow.id, {
           xstateDefinition: { nodes, edges },
-          metadata: {
-            ...currentWorkflow.metadata,
-            version: (currentWorkflow.version || 0) + 1,
-            lastSaved: new Date().toISOString(),
-          },
         });
 
         set((state) => {

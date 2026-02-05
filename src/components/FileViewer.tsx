@@ -10,32 +10,44 @@ import { VideoRenderer } from '../renderers/VideoRenderer';
 import { FileText, Image, Music, Video, FileSpreadsheet, AlertCircle } from 'lucide-react';
 
 interface FileViewerProps {
-  file: FileMetadata;
+  file?: FileMetadata;
+  fileUrl?: string;
+  fileType?: FileType;
+  metadata?: any;
   annotations?: Annotation[];
-  onAnnotationAdd?: (annotation: Annotation) => void;
-  onAnnotationRemove?: (annotationId: string) => void;
   width?: number;
   height?: number;
 }
 
 export const FileViewer = ({
   file,
+  fileUrl,
+  fileType,
+  metadata,
   annotations = [],
-  onAnnotationAdd,
-  onAnnotationRemove,
   width = 800,
   height = 600,
 }: FileViewerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<BaseRenderer | null>(null);
+
+  // Use either the file prop or construct from individual props
+  const fileData = file || {
+    id: 'task-file',
+    name: metadata?.fileName || 'Unknown',
+    type: fileType || FileType.TEXT,
+    url: fileUrl || '',
+    size: metadata?.fileSize || 0,
+    mimeType: metadata?.mimeType || '',
+  };
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [fileType, setFileType] = useState<FileType>(FileType.TEXT);
+  const [detectedFileType, setDetectedFileType] = useState<FileType>(fileData.type);
 
   useEffect(() => {
-    const detectedFileType = getFileType(file.name, file.mimeType);
-    setFileType(detectedFileType);
-  }, [file]);
+    const detectedFileType = getFileType(fileData.name, fileData.mimeType);
+    setDetectedFileType(detectedFileType);
+  }, [fileData]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -58,9 +70,11 @@ export const FileViewer = ({
       };
 
       try {
+        if (!containerRef.current) return;
+
         let renderer: BaseRenderer | null = null;
 
-        switch (fileType) {
+        switch (detectedFileType) {
           case FileType.TEXT:
           case FileType.MARKDOWN:
           case FileType.JSON:
@@ -83,7 +97,7 @@ export const FileViewer = ({
         }
 
         if (renderer) {
-          await renderer.load(file);
+          await renderer.load(fileData);
           rendererRef.current = renderer;
 
           annotations.forEach((annotation) => {
@@ -154,9 +168,9 @@ export const FileViewer = ({
         <div className="flex items-center gap-3">
           <div className="text-gray-600">{getFileIcon()}</div>
           <div>
-            <h3 className="font-medium text-gray-900 text-sm">{file.name}</h3>
+            <h3 className="font-medium text-gray-900 text-sm">{fileData.name}</h3>
             <p className="text-xs text-gray-500">
-              {fileType.toUpperCase()} • {formatFileSize(file.size)}
+              {detectedFileType.toUpperCase()} • {formatFileSize(fileData.size)}
             </p>
           </div>
         </div>

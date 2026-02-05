@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { store } from './store';
-import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleBasedRoute } from './components/RoleBasedRoute';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
@@ -17,6 +16,7 @@ import { TaskQueue } from './pages/annotator/TaskQueue';
 import { AnnotateTask } from './pages/annotator/AnnotateTask';
 import { ReviewQueue } from './pages/reviewer/ReviewQueue';
 import { ReviewTask } from './pages/reviewer/ReviewTask';
+import { UIBuilderPage } from './pages/ops/UIBuilderPage';
 import { UserRole } from './services/authService';
 
 function App() {
@@ -46,7 +46,7 @@ function App() {
           <Route
             path="/ops/*"
             element={
-              <RoleBasedRoute allowedRoles={[UserRole.OPS_MANAGER, UserRole.ADMIN]}>
+              <RoleBasedRoute allowedRoles={[UserRole.PROJECT_MANAGER, UserRole.ADMIN]}>
                 <Layout />
               </RoleBasedRoute>
             }
@@ -58,6 +58,8 @@ function App() {
             <Route path="projects/:id/edit" element={<EditProject />} />
             <Route path="workflows" element={<WorkflowManagement />} />
             <Route path="workflows/:workflowId" element={<WorkflowManagement />} />
+            <Route path="ui-builder" element={<UIBuilderPage />} />
+            <Route path="projects/:projectId/ui-builder" element={<UIBuilderPage />} />
             <Route path="batches" element={<div className="p-8">Batches - Coming Soon</div>} />
             <Route path="batches/create" element={<div className="p-8">Upload Batch - Coming Soon</div>} />
           </Route>

@@ -171,16 +171,9 @@ export const WorkflowManagement = () => {
 
       {showCreateModal && (
         <Modal
+          isOpen={showCreateModal}
           title="Create New Workflow"
           onClose={() => setShowCreateModal(false)}
-          actions={
-            <>
-              <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreateWorkflow}>Create Workflow</Button>
-            </>
-          }
         >
           <div className="space-y-4">
             <div>
@@ -226,6 +219,13 @@ export const WorkflowManagement = () => {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateWorkflow}>Create Workflow</Button>
             </div>
           </div>
         </Modal>

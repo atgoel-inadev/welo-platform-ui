@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { CheckSquare, Square, Star } from 'lucide-react';
 
 interface QuestionRendererProps {

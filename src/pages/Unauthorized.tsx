@@ -62,7 +62,7 @@ const getDashboardRoute = (role?: string): string => {
   switch (role) {
     case 'ADMIN':
       return '/admin';
-    case 'OPS_MANAGER':
+    case 'PROJECT_MANAGER':
       return '/ops';
     case 'ANNOTATOR':
       return '/annotator';

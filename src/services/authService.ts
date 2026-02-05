@@ -2,7 +2,7 @@ import { authApi } from '../lib/apiClient';
 
 export enum UserRole {
   ADMIN = 'ADMIN',
-  OPS_MANAGER = 'OPS_MANAGER',
+  PROJECT_MANAGER = 'PROJECT_MANAGER',
   ANNOTATOR = 'ANNOTATOR',
   REVIEWER = 'REVIEWER',
   CUSTOMER = 'CUSTOMER',

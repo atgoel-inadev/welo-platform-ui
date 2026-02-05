@@ -68,8 +68,6 @@ export const AnnotationTask = () => {
               <FileViewer
                 file={sampleFile}
                 annotations={annotations}
-                onAnnotationAdd={(annotation) => setAnnotations([...annotations, annotation])}
-                onAnnotationRemove={handleRemoveAnnotation}
                 width={800}
                 height={600}
               />

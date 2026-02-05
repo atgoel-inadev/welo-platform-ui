@@ -1,6 +1,6 @@
 import { Graphics, Text as PixiText, TextStyle } from 'pixi.js';
 import { BaseRenderer } from './BaseRenderer';
-import { FileMetadata, Annotation, RendererConfig } from '../types/renderer';
+import { FileMetadata, RendererConfig } from '../types/renderer';
 
 export class TextRenderer extends BaseRenderer {
   private textContainer: HTMLDivElement;

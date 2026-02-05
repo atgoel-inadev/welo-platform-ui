@@ -152,7 +152,7 @@ export const ProjectsList = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{project.project_type.replace(/_/g, ' ')}</div>
+                      <div className="text-sm text-gray-900">{project.project_type?.replaceAll('_', ' ') || 'N/A'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <Badge variant={getStatusBadgeVariant(project.status)}>

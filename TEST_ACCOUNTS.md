@@ -2,40 +2,45 @@
 
 ## 🔑 Login Credentials
 
-All accounts use the same password: **Test123!**
+**Note:** The backend uses passwords from `mock-users.json`
 
 ### Administrator Account
 - **Email:** admin@welo.com
-- **Password:** Test123!
+- **Password:** admin123
+- **User ID:** 550e8400-e29b-41d4-a716-446655440001
 - **Role:** ADMIN
 - **Access:** Full system access
 - **Default Route:** `/admin/dashboard`
 
-### Project Manager Account
-- **Email:** pm@welo.com
-- **Password:** Test123!
+### Project Manager Account (Operations Manager)
+- **Email:** ops@welo.com
+- **Password:** ops123
+- **User ID:** 550e8400-e29b-41d4-a716-446655440002
 - **Role:** PROJECT_MANAGER
 - **Access:** Ops management, project creation
 - **Default Route:** `/ops/dashboard`
 
-### Reviewer Account
-- **Email:** reviewer@welo.com
-- **Password:** Test123!
-- **Role:** REVIEWER
-- **Access:** Review queue, task review
-- **Default Route:** `/review/queue`
-
 ### Annotator Account
 - **Email:** annotator@welo.com
-- **Password:** Test123!
+- **Password:** annotator123
+- **User ID:** 550e8400-e29b-41d4-a716-446655440003
 - **Role:** ANNOTATOR
 - **Access:** Annotation tasks, task history
 - **Default Route:** `/annotate/queue`
 - **Demo:** `/annotate/task` - FileViewer demo
 
+### Reviewer Account
+- **Email:** reviewer@welo.com
+- **Password:** reviewer123
+- **User ID:** 550e8400-e29b-41d4-a716-446655440004
+- **Role:** REVIEWER
+- **Access:** Review queue, task review
+- **Default Route:** `/review/queue`
+
 ### Customer Account
 - **Email:** customer@welo.com
-- **Password:** Test123!
+- **Password:** customer123
+- **User ID:** 550e8400-e29b-41d4-a716-446655440005
 - **Role:** CUSTOMER
 - **Access:** Limited (needs implementation)
 - **Default Route:** `/`

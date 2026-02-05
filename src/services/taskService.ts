@@ -279,7 +279,7 @@ export class TaskService {
   /**
    * Get signed URL for file download
    */
-  async getFileSignedUrl(fileId: string): Promise<{ url: string; expiresAt: string }> {
+  async getFileSignedUrl(_fileId: string): Promise<{ url: string; expiresAt: string }> {
     // TODO: Implement file service endpoint
     // For now, files are accessed directly via fileUrl in task
     throw new Error('File service not yet implemented - use task.fileUrl directly');
@@ -290,7 +290,7 @@ export class TaskService {
    */
   async skipTask(taskId: string, reason: string): Promise<Task> {
     return this.updateTaskStatus(taskId, {
-      status: 'SKIPPED',
+      status: TaskStatus.SKIPPED,
       reason,
     });
   }
@@ -302,7 +302,7 @@ export class TaskService {
   /**
    * Get tasks for review (tasks with status PENDING_REVIEW or REVIEW_IN_PROGRESS)
    */
-  async getTasksForReview(userId: string, filters?: Partial<TaskFilterDto>): Promise<Task[]> {
+  async getTasksForReview(_userId: string, filters?: Partial<TaskFilterDto>): Promise<Task[]> {
     const response = await taskManagementApi.get<BackendResponse<PaginatedResponse<Task>>>('/tasks', {
       params: {
         taskType: 'REVIEW',

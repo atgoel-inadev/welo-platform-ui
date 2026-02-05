@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X, Plus, Trash2, GripVertical } from 'lucide-react';
-import { Question, QuestionType, ValidationRules, AnnotationConfig } from '../../types/workflow';
+import { Question, QuestionType } from '../../types/workflow';
 import { FormInput, Button } from '../common';
 
 interface QuestionBuilderProps {
@@ -188,7 +188,7 @@ export const QuestionBuilder = ({ questions: initialQuestions, onSave, onClose }
                         updateQuestion(editingIndex, {
                           annotation_config: {
                             ...currentQuestion.annotation_config,
-                            annotation_types: newTypes,
+                            annotation_types: newTypes as ('point' | 'rectangle' | 'polygon' | 'text' | 'timestamp')[],
                           },
                         });
                       }}

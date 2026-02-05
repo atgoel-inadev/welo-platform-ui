@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Briefcase, CheckCircle, Clock, Users, Plus } from 'lucide-react';
+import { Briefcase, CheckCircle, Clock, Users, Plus, Layout as LayoutIcon } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks/useRedux';
 import { fetchProjects } from '../../store/projectsSlice';
 import { StatCard, Button } from '../../components/common';
@@ -71,7 +71,9 @@ export const OpsDashboard = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="font-medium text-gray-900">{project.name}</h3>
-                        <p className="text-sm text-gray-500 mt-1">{project.project_type.replace('_', ' ')}</p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {project.project_type?.replaceAll('_', ' ') || 'N/A'}
+                        </p>
                       </div>
                       <span
                         className={`px-2 py-1 text-xs rounded-full ${
@@ -132,6 +134,18 @@ export const OpsDashboard = () => {
                 <div>
                   <p className="font-medium text-gray-900">Manage Projects</p>
                   <p className="text-sm text-gray-500">View and edit all projects</p>
+                </div>
+              </Link>
+              <Link
+                to="/ops/ui-builder"
+                className="flex items-center gap-3 p-4 border rounded-lg hover:bg-indigo-50 hover:border-indigo-300 transition-colors"
+              >
+                <div className="bg-indigo-100 p-2 rounded-lg">
+                  <LayoutIcon className="text-indigo-600" size={20} />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">UI Builder</p>
+                  <p className="text-sm text-gray-500">Design custom annotation interfaces</p>
                 </div>
               </Link>
             </div>

@@ -22,7 +22,6 @@ export const WorkflowBuilder = () => {
     onConnect,
     addNode,
     deleteNode,
-    updateNode,
     selectNode,
     saveWorkflowData,
     isLoading,

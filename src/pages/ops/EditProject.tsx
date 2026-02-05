@@ -3,16 +3,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Save, ArrowLeft } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks/useRedux';
 import { fetchProjectById, updateProject } from '../../store/projectsSlice';
-import { fetchCustomers } from '../../store/customersSlice';
 import { Button, FormInput, FormTextarea, FormSelect } from '../../components/common';
-import { ProjectType, ProjectStatus } from '../../types';
+import { ProjectStatus } from '../../types';
 
 export const EditProject = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { currentProject, loading: projectLoading } = useAppSelector((state) => state.projects);
-  const { customers, loading: customersLoading } = useAppSelector((state) => state.customers);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -27,7 +25,7 @@ export const EditProject = () => {
     if (id) {
       dispatch(fetchProjectById(id));
     }
-    dispatch(fetchCustomers());
+    // Note: Customer is read-only in edit mode, no need to fetch customers list
   }, [dispatch, id]);
 
   useEffect(() => {

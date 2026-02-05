@@ -26,7 +26,7 @@ export const Login = () => {
         case UserRole.ADMIN:
           navigate('/admin/dashboard', { replace: true });
           break;
-        case UserRole.OPS_MANAGER:
+        case UserRole.PROJECT_MANAGER:
           navigate('/ops/dashboard', { replace: true });
           break;
         case UserRole.REVIEWER:

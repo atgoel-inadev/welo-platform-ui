@@ -1,6 +1,5 @@
-import { Graphics, Text as PixiText, TextStyle } from 'pixi.js';
 import { BaseRenderer } from './BaseRenderer';
-import { FileMetadata, Annotation, RendererConfig, PlaybackState } from '../types/renderer';
+import { FileMetadata, RendererConfig, PlaybackState } from '../types/renderer';
 import { formatDuration } from '../utils/fileUtils';
 
 export class VideoRenderer extends BaseRenderer {

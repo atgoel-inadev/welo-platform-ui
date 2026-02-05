@@ -1,5 +1,5 @@
 import { projectManagementApi } from '../lib/apiClient';
-import { Project, Customer, ProjectStatus, CreateProjectInput, UpdateProjectInput } from '../types';
+import { Project, Customer, ProjectStatus, CreateProjectInput, UpdateProjectInput, ProjectStatistics } from '../types';
 
 /**
  * API Response types matching backend structure
@@ -159,22 +159,8 @@ export class ProjectService {
   /**
    * Get project statistics
    */
-  async getProjectStatistics(projectId: string): Promise<{
-    totalTasks: number;
-    completedTasks: number;
-    inProgressTasks: number;
-    queuedTasks: number;
-    completionRate: number;
-    averageQualityScore: number;
-  }> {
-    const response = await projectManagementApi.get<BackendResponse<{
-      totalTasks: number;
-      completedTasks: number;
-      inProgressTasks: number;
-      queuedTasks: number;
-      completionRate: number;
-      averageQualityScore: number;
-    }>>(`/projects/${projectId}/statistics`);
+  async getProjectStatistics(projectId: string): Promise<ProjectStatistics> {
+    const response = await projectManagementApi.get<BackendResponse<ProjectStatistics>>(`/projects/${projectId}/statistics`);
     return response.data;
   }
 
@@ -186,10 +172,31 @@ export class ProjectService {
   }
 
   /**
+   * Get a single customer by ID
+   */
+  async getCustomer(id: string): Promise<Customer> {
+    return projectManagementApi.get<Customer>(`/customers/${id}`);
+  }
+
+  /**
    * Create a new customer
    */
   async createCustomer(data: { name: string; email: string; subscription?: string }): Promise<Customer> {
     return projectManagementApi.post<Customer>('/customers', data);
+  }
+
+  /**
+   * Update an existing customer
+   */
+  async updateCustomer(id: string, data: { name?: string; email?: string; subscription?: string }): Promise<Customer> {
+    return projectManagementApi.patch<Customer>(`/customers/${id}`, data);
+  }
+
+  /**
+   * Delete a customer
+   */
+  async deleteCustomer(id: string): Promise<void> {
+    return projectManagementApi.delete(`/customers/${id}`);
   }
 }
 

@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { FileViewer } from '../FileViewer';
 import { FileMetadata, Annotation } from '../../types/renderer';
-import { FileType } from '../../types';
 import { Question } from '../../types/workflow';
 import { Button, FormInput } from '../common';
 import { Save, SkipForward, ChevronRight, ChevronLeft } from 'lucide-react';
@@ -21,7 +20,7 @@ export const WorkflowAnnotationTask = ({
 }: WorkflowAnnotationTaskProps) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [responses, setResponses] = useState<Record<string, any>>({});
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [annotations] = useState<Annotation[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const currentQuestion = questions[currentQuestionIndex];
@@ -274,10 +273,6 @@ export const WorkflowAnnotationTask = ({
           <FileViewer
             file={file}
             annotations={annotations}
-            onAnnotationAdd={(annotation) => setAnnotations([...annotations, annotation])}
-            onAnnotationRemove={(annotationId) =>
-              setAnnotations(annotations.filter((a) => a.id !== annotationId))
-            }
           />
         </div>
       )}
