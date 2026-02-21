@@ -118,6 +118,19 @@ export interface ReviewLevel {
   allowed_reviewers?: string[];
 }
 
+export interface WorkflowStage {
+  id: string;
+  name: string;
+  type: 'ANNOTATION' | 'REVIEW' | 'QA' | 'APPROVAL';
+  annotators_count: number;
+  reviewers_count: number;
+  max_rework_attempts: number;
+  require_consensus: boolean;
+  consensus_threshold: number;
+  auto_assign: boolean;
+  allowed_users?: string[];
+}
+
 export interface WorkflowConfiguration {
   review_levels: ReviewLevel[];
   enable_multi_annotator: boolean;
@@ -126,6 +139,10 @@ export interface WorkflowConfiguration {
   queue_strategy: 'FIFO' | 'PRIORITY' | 'SKILL_BASED';
   assignment_expiration_hours: number;
   max_tasks_per_annotator: number;
+  stages?: WorkflowStage[];
+  global_max_rework_before_reassignment?: number;
+  enable_quality_gates?: boolean;
+  minimum_quality_score?: number;
 }
 
 export interface Project {

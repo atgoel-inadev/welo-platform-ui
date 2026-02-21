@@ -142,13 +142,13 @@ export const WorkflowManagement = () => {
                 <div className="flex items-center gap-4 text-sm text-gray-500">
                   <div>
                     <span className="font-medium">
-                      {workflow.flow_data.nodes?.length || 0}
+                      {workflow.flow_data?.nodes?.length || 0}
                     </span>{' '}
                     nodes
                   </div>
                   <div>
                     <span className="font-medium">
-                      {workflow.flow_data.edges?.length || 0}
+                      {workflow.flow_data?.edges?.length || 0}
                     </span>{' '}
                     connections
                   </div>

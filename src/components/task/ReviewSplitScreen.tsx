@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { FileViewer } from '../FileViewer';
 import { taskRenderingService, TaskRenderConfig, SaveReviewDto } from '../../services/taskRenderingService';
+import { annotationQaService, QaSummary } from '../../services/annotationQaService';
 
 interface ReviewSplitScreenProps {
   taskId: string;
@@ -245,6 +246,9 @@ const ReviewSplitScreen: React.FC<ReviewSplitScreenProps> = ({ taskId, userId })
   const [comments, setComments] = useState('');
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
 
+  // QA summary from annotation-qa-service (auto-QC results, prior reviews)
+  const [qaSummary, setQaSummary] = useState<QaSummary | null>(null);
+
   // Timer
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -266,6 +270,14 @@ const ReviewSplitScreen: React.FC<ReviewSplitScreenProps> = ({ taskId, userId })
       // Expand all questions by default
       const questions = cfg.annotationQuestions || [];
       setExpandedQuestions(new Set(questions.map((q: Question) => q.id)));
+
+      // Load QA summary (non-blocking — auto-QC results, prior scores)
+      try {
+        const summary = await annotationQaService.getQaSummary(taskId);
+        setQaSummary(summary);
+      } catch {
+        // QA service may not be running; reviewer can still proceed
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load task');
     } finally {
@@ -290,18 +302,49 @@ const ReviewSplitScreen: React.FC<ReviewSplitScreenProps> = ({ taskId, userId })
     try {
       setSubmitting(true);
 
-      // Compute quality score from individual scores if overall not set
+      // Compute quality score from individual question scores, fallback to overall slider
       const scoredCount = Object.values(questionScores).filter((s) => s.score > 0).length;
       const avgScore = scoredCount > 0
         ? Math.round(
             (Object.values(questionScores).reduce((acc, s) => acc + s.score, 0) / scoredCount) * 20
           )
         : overallScore;
+      const computedScore = avgScore || overallScore || 0;
 
+      const decisionMap = {
+        approved: 'APPROVE',
+        rejected: 'REJECT',
+        needs_revision: 'REQUEST_REVISION',
+      } as const;
+
+      // Submit to annotation-qa-service: records reviewer score, triggers state decision
+      // (APPROVE/REJECT/REQUEST_REVISION/ESCALATE based on overallScore = review*0.6 + autoQC*0.4)
+      const annotationId = (config?.previousAnnotations || []).find((a: any) => !a.isGold)?.id;
+      if (annotationId) {
+        try {
+          const issueNotes = Object.values(questionScores)
+            .filter((s) => s.score > 0 && s.score < 3 && s.note)
+            .map((s) => s.note as string);
+
+          await annotationQaService.submitReview(taskId, {
+            annotationId,
+            score: computedScore,
+            decision: decisionMap[decision],
+            feedback: comments || undefined,
+            issues: issueNotes.length > 0 ? issueNotes : undefined,
+            timeSpent: elapsed,
+          });
+        } catch (qaErr) {
+          console.warn('Annotation QA review service unavailable:', qaErr);
+        }
+      }
+
+      // Submit to task rendering service (updates workflow engine state)
       const reviewData: SaveReviewDto = {
         decision,
         comments: comments || undefined,
-        qualityScore: avgScore || overallScore || undefined,
+        qualityScore: computedScore || undefined,
+        timeSpent: elapsed,
         extraWidgetData: {
           questionScores,
           timeSpentSeconds: elapsed,
@@ -540,6 +583,41 @@ const ReviewSplitScreen: React.FC<ReviewSplitScreenProps> = ({ taskId, userId })
               </div>
             )}
           </div>
+
+          {/* ── Auto-QC Context Panel ── */}
+          {qaSummary?.annotation?.qcResult && (
+            <div className="mx-4 mb-3 mt-1 rounded-xl border p-3 bg-gray-50 border-gray-200 flex-shrink-0">
+              <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Auto Quality Check Result</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded ${
+                  qaSummary.annotation.qcResult.passed
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-red-100 text-red-700'
+                }`}>
+                  {qaSummary.annotation.qcResult.passed
+                    ? <CheckCircle size={11} />
+                    : <XCircle size={11} />}
+                  {qaSummary.annotation.qcResult.passed ? 'Passed' : 'Failed'}
+                </span>
+                <span className="text-xs text-gray-700">
+                  QC Score: <strong>{Math.round(qaSummary.annotation.qcResult.overallScore * 100)}%</strong>
+                </span>
+                {qaSummary.annotation.qcResult.goldComparisonScore !== undefined && (
+                  <span className="text-xs text-gray-700">
+                    Gold Match: <strong>{Math.round(qaSummary.annotation.qcResult.goldComparisonScore * 100)}%</strong>
+                  </span>
+                )}
+                {qaSummary.stateDecision && (
+                  <span className="text-xs text-gray-500 ml-auto">
+                    Attempt score: <strong>{Math.round(qaSummary.stateDecision.overallScore * 100)}%</strong>
+                    {qaSummary.stateDecision.requiresEscalation && (
+                      <span className="ml-1 text-red-600 font-semibold">· Escalation required</span>
+                    )}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ── Review Decision Form ── */}
           <div className="flex-shrink-0 bg-white border-t border-gray-200 p-4 shadow-lg">

@@ -1,7 +1,7 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { UserRole } from '../types';
-import { Users, Briefcase, CheckSquare, FileEdit, LogOut, LayoutDashboard, Workflow } from 'lucide-react';
+import { Users, Briefcase, CheckSquare, FileEdit, LogOut, LayoutDashboard, Workflow, Clock } from 'lucide-react';
 import { ReactNode } from 'react';
 
 interface LayoutProps {
@@ -34,6 +34,7 @@ export const Layout = ({ children }: LayoutProps = {}) => {
           { to: '/ops/workflows', icon: Workflow, label: 'Workflows' },
           { to: '/ops/batches', icon: FileEdit, label: 'Batches' },
           { to: '/ops/users', icon: Users, label: 'Users' },
+          { to: '/ops/analytics/time', icon: Clock, label: 'Time Analytics' },
         ];
       case UserRole.REVIEWER:
         return [

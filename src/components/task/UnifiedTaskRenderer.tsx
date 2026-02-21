@@ -12,6 +12,11 @@ import {
   SaveAnnotationDto,
   SaveReviewDto,
 } from '../../services/taskRenderingService';
+import {
+  annotationQaService,
+  AnnotationQaRecord,
+  QcCheckResult,
+} from '../../services/annotationQaService';
 
 interface UnifiedTaskRendererProps {
   taskId: string;
@@ -368,6 +373,7 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [annotationQaRecord, setAnnotationQaRecord] = useState<AnnotationQaRecord | null>(null);
 
   // Sequential question navigation
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
@@ -475,10 +481,27 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
     if (!validateAnnotationForm()) return;
     try {
       setSubmitting(true);
+
+      // Submit to annotation-qa-service: records annotation + triggers gold comparison & quality rules
+      try {
+        const qaRecord = await annotationQaService.submitAnnotation(taskId, {
+          annotationData: formData,
+          timeSpent: elapsedSeconds,
+          isDraft: false,
+        });
+        setAnnotationQaRecord(qaRecord);
+      } catch (qaErr) {
+        // QA pipeline failure is non-blocking — log and continue
+        console.warn('Annotation QA service unavailable:', qaErr);
+      }
+
+      // Submit to task rendering service (updates workflow engine state)
       const annotationData: SaveAnnotationDto = {
         responses: Object.entries(formData).map(([questionId, response]) => ({ questionId, response })),
+        timeSpent: elapsedSeconds,
       };
       await taskRenderingService.saveAnnotation(taskId, userId, annotationData);
+
       setSubmitted(true);
     } catch (err: any) {
       alert(err.message || 'Failed to save annotation');
@@ -495,12 +518,38 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
   const handleSubmitReview = async (decision: 'approved' | 'rejected' | 'needs_revision') => {
     try {
       setSubmitting(true);
+
+      const decisionMap = {
+        approved: 'APPROVE',
+        rejected: 'REJECT',
+        needs_revision: 'REQUEST_REVISION',
+      } as const;
+
+      // Submit to annotation-qa-service: records reviewer score + triggers state decision
+      const annotationId = config?.previousAnnotations?.[0]?.id;
+      if (annotationId) {
+        try {
+          await annotationQaService.submitReview(taskId, {
+            annotationId,
+            score: qualityScore,
+            decision: decisionMap[decision],
+            feedback: reviewComments || undefined,
+            timeSpent: elapsedSeconds,
+          });
+        } catch (qaErr) {
+          console.warn('Annotation QA review service unavailable:', qaErr);
+        }
+      }
+
+      // Submit to task rendering service (updates workflow engine state)
       const reviewData: SaveReviewDto = {
         decision,
         comments: reviewComments || undefined,
         qualityScore: qualityScore || undefined,
+        timeSpent: elapsedSeconds,
       };
       await taskRenderingService.saveReview(taskId, userId, reviewData);
+
       setReviewDecision(decision);
       setSubmitted(true);
     } catch (err: any) {
@@ -549,18 +598,57 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
 
   // ── Submitted ──────────────────────────────────────────────────────────────
   if (submitted) {
+    const qcResult = annotationQaRecord?.qcResult;
     return (
-      <div className="flex items-center justify-center h-[60vh]">
-        <div className="text-center">
+      <div className="flex items-center justify-center min-h-[60vh] p-6">
+        <div className="text-center max-w-md w-full">
           <CheckCircle className="text-green-500 mx-auto mb-4" size={56} />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
             {viewType === 'annotator' ? 'Annotation Submitted!' : `Review ${reviewDecision?.replace('_', ' ')}!`}
           </h2>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600 mb-5">
             {viewType === 'annotator'
               ? 'Your annotation has been saved successfully.'
               : 'Your review decision has been recorded.'}
           </p>
+
+          {/* Auto-QC result panel (annotator view only) */}
+          {viewType === 'annotator' && qcResult && (
+            <div className={`rounded-xl border p-4 mb-5 text-left ${
+              qcResult.passed ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'
+            }`}>
+              <div className="flex items-center gap-2 mb-3">
+                {qcResult.passed
+                  ? <CheckCircle size={18} className="text-green-600" />
+                  : <AlertCircle size={18} className="text-amber-600" />}
+                <span className={`font-semibold text-sm ${qcResult.passed ? 'text-green-800' : 'text-amber-800'}`}>
+                  Auto Quality Check: {qcResult.passed ? 'Passed' : 'Needs Review'}
+                </span>
+                <span className={`ml-auto text-sm font-bold ${qcResult.passed ? 'text-green-700' : 'text-amber-700'}`}>
+                  {Math.round(qcResult.overallScore * 100)}%
+                </span>
+              </div>
+              {qcResult.goldComparisonScore !== undefined && (
+                <p className="text-xs text-gray-600 mb-2">
+                  Gold standard similarity: <strong>{Math.round(qcResult.goldComparisonScore * 100)}%</strong>
+                </p>
+              )}
+              {qcResult.checks.length > 0 && (
+                <div className="space-y-1">
+                  {qcResult.checks.map((check: QcCheckResult, i: number) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      {check.passed
+                        ? <CheckCircle size={12} className="text-green-500 flex-shrink-0" />
+                        : <AlertCircle size={12} className={`flex-shrink-0 ${check.severity === 'ERROR' ? 'text-red-500' : 'text-amber-500'}`} />}
+                      <span className="text-gray-700">{check.ruleName}</span>
+                      {check.message && <span className="text-gray-400 ml-auto truncate max-w-[120px]">{check.message}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-3 justify-center">
             <button
               className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"

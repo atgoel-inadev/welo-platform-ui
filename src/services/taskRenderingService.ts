@@ -10,6 +10,7 @@ export interface AnnotationResponse {
 export interface SaveAnnotationDto {
   responses: AnnotationResponse[];
   extraWidgetData?: Record<string, any>;
+  timeSpent?: number;
 }
 
 export interface SaveReviewDto {
@@ -17,6 +18,7 @@ export interface SaveReviewDto {
   comments?: string;
   qualityScore?: number;
   extraWidgetData?: Record<string, any>;
+  timeSpent?: number;
 }
 
 export interface TaskRenderConfig {

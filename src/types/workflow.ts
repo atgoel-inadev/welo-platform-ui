@@ -18,7 +18,7 @@ export interface Workflow {
   project_id: string;
   name: string;
   description: string;
-  flow_data: {
+  flow_data?: {
     nodes: Node[];
     edges: Edge[];
   };

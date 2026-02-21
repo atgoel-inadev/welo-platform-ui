@@ -194,7 +194,7 @@ class WorkflowService {
       name: newName,
       description: `Cloned from: ${original.name}`,
       projectId: newProjectId || original.project_id,
-      xstateDefinition: original.flow_data, // Assuming flow_data maps to xstateDefinition
+      xstateDefinition: original.flow_data || { nodes: [], edges: [] }, // Assuming flow_data maps to xstateDefinition
       metadata: {
         ...original,
         clonedFrom: workflowId,

@@ -157,6 +157,49 @@ export interface ReviewSubmitDto {
   tags?: string[];
 }
 
+export interface TimeAnalyticsQueryDto {
+  projectId?: string;
+  batchId?: string;
+  startDate?: string;
+  endDate?: string;
+  userId?: string;
+}
+
+export interface AnnotatorMetric {
+  userId: string;
+  totalTasks: number;
+  totalTimeSpent: number;
+  averageTimePerTask: number;
+}
+
+export interface ReviewerMetric {
+  userId: string;
+  totalReviews: number;
+  totalTimeSpent: number;
+  averageTimePerReview: number;
+}
+
+export interface TaskTimeMetric {
+  taskId: string;
+  estimatedDuration: number;
+  actualDuration: number;
+  efficiency: number;
+}
+
+export interface TimeAnalytics {
+  summary: {
+    totalAnnotators: number;
+    totalReviewers: number;
+    totalAnnotationTime: number;
+    totalReviewTime: number;
+    averageAnnotationTime: number;
+    averageReviewTime: number;
+  };
+  annotatorMetrics: AnnotatorMetric[];
+  reviewerMetrics: ReviewerMetric[];
+  taskMetrics: TaskTimeMetric[];
+}
+
 export interface ConsensusData {
   taskId: string;
   totalAnnotations: number;
@@ -422,6 +465,17 @@ export class TaskService {
   async getTaskQualityMetrics(taskId: string): Promise<TaskStatistics> {
     const response = await taskManagementApi.get<TaskStatistics>(
       `/tasks/${taskId}/statistics`
+    );
+    return response;
+  }
+
+  /**
+   * Get time analytics for annotators and reviewers
+   */
+  async getTimeAnalytics(query: TimeAnalyticsQueryDto = {}): Promise<TimeAnalytics> {
+    const response = await taskManagementApi.get<TimeAnalytics>(
+      '/tasks/analytics/time',
+      { params: query }
     );
     return response;
   }

@@ -68,14 +68,47 @@ export const useWorkflowStore = create<WorkflowState>()(
 
     addNode: (type, position) => {
       const id = `${type}-${Date.now()}`;
+      
+      // Initialize data based on node type
+      let nodeData: any = {
+        label: `${type.charAt(0).toUpperCase() + type.slice(1).replace(/([A-Z])/g, ' $1').trim()}`,
+      };
+
+      // Add type-specific data
+      if (type === 'question') {
+        nodeData.questions = [];
+      } else if (type === 'annotationStage') {
+        nodeData = {
+          ...nodeData,
+          label: 'Annotation Stage',
+          annotators: [],
+          requireConsensus: false,
+          consensusThreshold: 0.8,
+          maxReworkAttempts: 3,
+        };
+      } else if (type === 'reviewStage') {
+        nodeData = {
+          ...nodeData,
+          label: 'Review Stage',
+          reviewers: [],
+          reviewLevel: 1,
+          maxReworkAttempts: 3,
+        };
+      } else if (type === 'qaStage') {
+        nodeData = {
+          ...nodeData,
+          label: 'QA Stage',
+          qaReviewers: [],
+          qualityThreshold: 0.9,
+          autoAssign: true,
+        };
+      }
+
       const newNode: Node = {
         id,
         type,
         position,
-        data: {
-          label: `${type.charAt(0).toUpperCase() + type.slice(1)} Node`,
-          questions: type === 'question' ? [] : undefined,
-        },
+        data: nodeData,
       };
 
       set((state) => {
@@ -128,8 +161,8 @@ export const useWorkflowStore = create<WorkflowState>()(
 
         set({
           currentWorkflow: workflow,
-          nodes: workflow.flow_data.nodes || [],
-          edges: workflow.flow_data.edges || [],
+          nodes: workflow.flow_data?.nodes || [],
+          edges: workflow.flow_data?.edges || [],
           isLoading: false,
         });
       } catch (error) {

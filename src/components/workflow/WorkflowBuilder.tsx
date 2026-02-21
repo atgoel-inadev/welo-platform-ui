@@ -8,7 +8,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { StartNode, QuestionNode, DecisionNode, ConditionNode, EndNode } from './nodes';
+import { StartNode, QuestionNode, DecisionNode, ConditionNode, EndNode, AnnotationStageNode, ReviewStageNode, QAStageNode } from './nodes';
 import { WorkflowToolbar } from './WorkflowToolbar';
 import { useWorkflowStore } from '../../store/workflowStore';
 import { Save, AlertCircle } from 'lucide-react';
@@ -36,6 +36,9 @@ export const WorkflowBuilder = () => {
       decision: DecisionNode,
       condition: ConditionNode,
       end: EndNode,
+      annotationStage: AnnotationStageNode,
+      reviewStage: ReviewStageNode,
+      qaStage: QAStageNode,
     }),
     []
   );
