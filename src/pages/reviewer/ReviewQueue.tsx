@@ -9,7 +9,7 @@ import { Button } from '../../components/common/Button';
 import { useAppSelector } from '../../hooks/useRedux';
 import { batchService, Batch, BatchStatistics } from '../../services/batchService';
 import { projectService } from '../../services/projectService';
-import { Project } from '../../types';
+import { Project, TaskStatus } from '../../types';
 
 export const ReviewQueue = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -55,10 +55,13 @@ export const ReviewQueue = () => {
       setError(null);
       setLoading(true);
 
-      // Load tasks
-      const statusFilter = 
-        selectedStatus === 'pending' ? 'PENDING_REVIEW' :
-        selectedStatus === 'in_review' ? 'IN_PROGRESS' :
+      // Load tasks — filter by task status:
+      // 'pending' → SUBMITTED (annotated, awaiting review)
+      // 'in_review' → IN_REVIEW (currently being reviewed)
+      // 'all' / '' → no status override (defaults to SUBMITTED in getTasksForReview)
+      const statusFilter =
+        selectedStatus === 'pending' ? 'SUBMITTED' :
+        selectedStatus === 'in_review' ? 'IN_REVIEW' :
         undefined;
 
       const tasksData = await taskService.getTasksForReview(userId, {
@@ -123,11 +126,15 @@ export const ReviewQueue = () => {
     }
 
     try {
-      // TODO: Implement report issue API call
-      console.log('Report issue:', taskId, issueDescription);
+      await taskService.updateTaskStatus(taskId, {
+        status: TaskStatus.SKIPPED,
+        reason: issueDescription,
+        metadata: { type: 'ISSUE_REPORT', reportedBy: userId },
+      });
       setReportingTask(null);
       setIssueDescription('');
       alert('Issue reported successfully!');
+      await loadData();
     } catch (error) {
       console.error('Failed to report issue:', error);
       alert('Failed to report issue');

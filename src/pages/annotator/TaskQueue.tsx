@@ -7,9 +7,10 @@ import {
 import { useAppDispatch, useAppSelector } from '../../hooks/useRedux';
 import { fetchMyTasks, pullNextTask } from '../../store/tasksSlice';
 import { Button } from '../../components/common/Button';
+import { taskService } from '../../services/taskService';
 import { batchService, Batch, BatchStatistics } from '../../services/batchService';
 import { projectService } from '../../services/projectService';
-import { Project } from '../../types';
+import { Project, TaskStatus } from '../../types';
 
 export const TaskQueue = () => {
   const navigate = useNavigate();
@@ -115,16 +116,17 @@ export const TaskQueue = () => {
     navigate(`/annotate/task/${taskId}`);
   };
 
-  const handleReleaseTask = async (assignmentId: string) => {
+  const handleReleaseTask = async (taskId: string, assignmentId: string) => {
     if (!confirm('Are you sure you want to release this task? It will be returned to the queue.')) {
       return;
     }
 
     setActionLoading(assignmentId);
     try {
-      // TODO: Implement release task API call
-      // await taskService.releaseTask(assignmentId);
-      console.log('Release task:', assignmentId);
+      await taskService.updateTaskStatus(taskId, {
+        status: TaskStatus.QUEUED,
+        reason: 'Released by annotator',
+      });
       await loadData();
     } catch (error) {
       console.error('Failed to release task:', error);
@@ -133,16 +135,14 @@ export const TaskQueue = () => {
     }
   };
 
-  const handleSkipTask = async (assignmentId: string) => {
+  const handleSkipTask = async (taskId: string, assignmentId: string) => {
     if (!confirm('Are you sure you want to skip this task? You will not be able to work on it again.')) {
       return;
     }
 
     setActionLoading(assignmentId);
     try {
-      // TODO: Implement skip task API call
-      // await taskService.skipTask(assignmentId);
-      console.log('Skip task:', assignmentId);
+      await taskService.skipTask(taskId, 'Skipped by annotator');
       await loadData();
     } catch (error) {
       console.error('Failed to skip task:', error);
@@ -151,7 +151,7 @@ export const TaskQueue = () => {
     }
   };
 
-  const handleReportIssue = async (assignmentId: string) => {
+  const handleReportIssue = async (taskId: string, assignmentId: string) => {
     if (!issueDescription.trim()) {
       alert('Please describe the issue');
       return;
@@ -159,12 +159,15 @@ export const TaskQueue = () => {
 
     setActionLoading(assignmentId);
     try {
-      // TODO: Implement report issue API call
-      // await taskService.reportIssue(assignmentId, issueDescription);
-      console.log('Report issue:', assignmentId, issueDescription);
+      await taskService.updateTaskStatus(taskId, {
+        status: TaskStatus.SKIPPED,
+        reason: issueDescription,
+        metadata: { type: 'ISSUE_REPORT', reportedBy: userId },
+      });
       setReportingTask(null);
       setIssueDescription('');
       alert('Issue reported successfully!');
+      await loadData();
     } catch (error) {
       console.error('Failed to report issue:', error);
       alert('Failed to report issue');
@@ -472,7 +475,7 @@ export const TaskQueue = () => {
                     </Button>
 
                     <button
-                      onClick={() => handleReleaseTask(assignment.id)}
+                      onClick={() => handleReleaseTask(task.id, assignment.id)}
                       disabled={!!actionLoading}
                       className="flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
                     >
@@ -481,7 +484,7 @@ export const TaskQueue = () => {
                     </button>
 
                     <button
-                      onClick={() => handleSkipTask(assignment.id)}
+                      onClick={() => handleSkipTask(task.id, assignment.id)}
                       disabled={!!actionLoading}
                       className="flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
                     >
@@ -522,7 +525,7 @@ export const TaskQueue = () => {
                         Cancel
                       </button>
                       <button
-                        onClick={() => handleReportIssue(assignment.id)}
+                        onClick={() => handleReportIssue(task.id, assignment.id)}
                         disabled={!issueDescription.trim() || !!actionLoading}
                         className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                       >

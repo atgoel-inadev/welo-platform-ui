@@ -11,6 +11,7 @@ import { OpsDashboard } from './pages/ops/OpsDashboard';
 import { ProjectsList } from './pages/ops/ProjectsList';
 import { CreateProject } from './pages/ops/CreateProject';
 import { EditProject } from './pages/ops/EditProject';
+import { ProjectDetail } from './pages/ops/ProjectDetail';
 import { WorkflowManagement } from './pages/ops/WorkflowManagement';
 import { TaskQueue } from './pages/annotator/TaskQueue';
 import { AnnotateTask } from './pages/annotator/AnnotateTask';
@@ -21,6 +22,7 @@ import { BatchUpload } from './pages/ops/BatchUpload';
 import { BatchList } from './pages/ops/BatchList';
 import { BatchDetails } from './pages/ops/BatchDetails';
 import { UserManagement } from './pages/ops/UserManagement';
+import { DemoWorkflow } from './pages/ops/DemoWorkflow';
 import { UserRole } from './services/authService';
 
 function App() {
@@ -42,7 +44,7 @@ function App() {
             }
           >
             <Route path="dashboard" element={<AdminDashboard />} />
-            <Route path="users" element={<div className="p-8">Users Management - Coming Soon</div>} />
+            <Route path="users" element={<UserManagement />} />
             <Route path="analytics" element={<div className="p-8">Analytics - Coming Soon</div>} />
           </Route>
 
@@ -58,7 +60,7 @@ function App() {
             <Route path="dashboard" element={<OpsDashboard />} />
             <Route path="projects" element={<ProjectsList />} />
             <Route path="projects/create" element={<CreateProject />} />
-            <Route path="projects/:id" element={<div className="p-8">View Project - Coming Soon</div>} />
+            <Route path="projects/:id" element={<ProjectDetail />} />
             <Route path="projects/:id/edit" element={<EditProject />} />
             <Route path="workflows" element={<WorkflowManagement />} />
             <Route path="workflows/:workflowId" element={<WorkflowManagement />} />
@@ -67,6 +69,8 @@ function App() {
             <Route path="batches" element={<BatchList />} />
             <Route path="batches/upload" element={<BatchUpload />} />
             <Route path="batches/:id" element={<BatchDetails />} />
+            <Route path="projects/:projectId/batch-upload" element={<BatchUpload />} />
+            <Route path="projects/:projectId/demo" element={<DemoWorkflow />} />
             <Route path="users" element={<UserManagement />} />
           </Route>
 

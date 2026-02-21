@@ -47,8 +47,15 @@ class ApiClient {
           // Handle 401 Unauthorized - token expired or invalid
           if (status === 401) {
             this.clearToken();
-            // Redirect to login or trigger token refresh
-            window.location.href = '/login';
+            // Clear stored tokens so checkSession won't retry with stale credentials
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+            // Redirect to login only if not already there (prevents infinite reload loop)
+            const path = window.location.pathname;
+            if (path !== '/login' && path !== '/signup') {
+              window.location.href = '/login';
+            }
           }
 
           // Handle other status codes

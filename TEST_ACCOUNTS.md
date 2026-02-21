@@ -7,43 +7,54 @@
 ### Administrator Account
 - **Email:** admin@welo.com
 - **Password:** admin123
-- **User ID:** 550e8400-e29b-41d4-a716-446655440001
+- **User ID:** 650e8400-e29b-41d4-a716-446655440001
 - **Role:** ADMIN
 - **Access:** Full system access
 - **Default Route:** `/admin/dashboard`
 
-### Project Manager Account (Operations Manager)
-- **Email:** ops@welo.com
-- **Password:** ops123
-- **User ID:** 550e8400-e29b-41d4-a716-446655440002
+### Project Manager Account
+- **Email:** pm1@welo.com
+- **Password:** pm1234
+- **User ID:** 650e8400-e29b-41d4-a716-446655440002
 - **Role:** PROJECT_MANAGER
-- **Access:** Ops management, project creation
+- **Access:** Project management, batch operations
 - **Default Route:** `/ops/dashboard`
 
-### Annotator Account
-- **Email:** annotator@welo.com
+### Annotator Accounts
+
+#### Annotator 1
+- **Email:** annotator1@welo.com
 - **Password:** annotator123
-- **User ID:** 550e8400-e29b-41d4-a716-446655440003
+- **User ID:** 650e8400-e29b-41d4-a716-446655440003
 - **Role:** ANNOTATOR
 - **Access:** Annotation tasks, task history
 - **Default Route:** `/annotate/queue`
-- **Demo:** `/annotate/task` - FileViewer demo
 
-### Reviewer Account
-- **Email:** reviewer@welo.com
+#### Annotator 2
+- **Email:** annotator2@welo.com
+- **Password:** annotator123
+- **User ID:** 650e8400-e29b-41d4-a716-446655440004
+- **Role:** ANNOTATOR
+- **Access:** Annotation tasks, task history
+- **Default Route:** `/annotate/queue`
+
+### Reviewer Accounts
+
+#### Reviewer 1
+- **Email:** reviewer1@welo.com
 - **Password:** reviewer123
-- **User ID:** 550e8400-e29b-41d4-a716-446655440004
+- **User ID:** 650e8400-e29b-41d4-a716-446655440005
 - **Role:** REVIEWER
 - **Access:** Review queue, task review
 - **Default Route:** `/review/queue`
 
-### Customer Account
-- **Email:** customer@welo.com
-- **Password:** customer123
-- **User ID:** 550e8400-e29b-41d4-a716-446655440005
-- **Role:** CUSTOMER
-- **Access:** Limited (needs implementation)
-- **Default Route:** `/`
+#### Reviewer 2
+- **Email:** reviewer2@welo.com
+- **Password:** reviewer123
+- **User ID:** 650e8400-e29b-41d4-a716-446655440006
+- **Role:** REVIEWER
+- **Access:** Review queue, task review
+- **Default Route:** `/review/queue`
 
 ---
 

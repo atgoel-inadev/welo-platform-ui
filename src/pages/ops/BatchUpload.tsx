@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, Loader2, Users } from 'lucide-react';
 import Papa from 'papaparse';
 import { batchService, FileAllocationDto } from '../../services/batchService';
 import { projectService } from '../../services/projectService';
+import { userService, ProjectTeamMember } from '../../services/userService';
 import { Project } from '../../types';
 import { QuickUserCreate } from '../../components/common/QuickUserCreate';
 
@@ -38,11 +39,23 @@ export const BatchUpload = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
   const [createdBatchId, setCreatedBatchId] = useState<string | null>(null);
+  
+  const [teamMembers, setTeamMembers] = useState<ProjectTeamMember[]>([]);
+  const [teamLoading, setTeamLoading] = useState(false);
 
   // Load projects on mount
   useEffect(() => {
     loadProjects();
   }, []);
+
+  // Load team members when project is selected
+  useEffect(() => {
+    if (projectId) {
+      loadTeamMembers();
+    } else {
+      setTeamMembers([]);
+    }
+  }, [projectId]);
 
   const loadProjects = async () => {
     setProjectsLoading(true);
@@ -57,6 +70,20 @@ export const BatchUpload = () => {
     }
   };
 
+  const loadTeamMembers = async () => {
+    if (!projectId) return;
+    
+    setTeamLoading(true);
+    try {
+      const members = await userService.getProjectTeam(projectId);
+      setTeamMembers(members);
+    } catch (error: any) {
+      console.error('Failed to load team members:', error);
+    } finally {
+      setTeamLoading(false);
+    }
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -68,6 +95,85 @@ export const BatchUpload = () => {
 
     setCSVFile(file);
     parseCSV(file);
+  };
+
+  const handleBrowseFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newFiles: ParsedFile[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      // Copy file to public/uploads directory for demo
+      const copiedUrl = await copyFileToUploads(file);
+      
+      // Detect file type from extension
+      const fileType = detectFileType(file.name);
+      
+      newFiles.push({
+        externalId: `file_${parsedFiles.length + i + 1}`,
+        fileUrl: copiedUrl,
+        fileType,
+        fileName: file.name,
+        fileSize: file.size,
+        status: 'valid',
+      });
+    }
+
+    setParsedFiles([...parsedFiles, ...newFiles]);
+    setUploadStep('preview');
+  };
+
+  const copyFileToUploads = async (file: File): Promise<string> => {
+    try {
+      // For demo: save to public/uploads and return the API URL
+      // In production, this would be a proper upload endpoint
+      
+      // Create FormData to simulate file copy
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // For demo, we'll use the file name and construct the URL
+      // The file should be manually placed in public/uploads or use a file input workaround
+      const backendUrl = `http://localhost:3004/api/v1/media/${file.name}`;
+      
+      // Store file in browser's temporary storage (for demo simulation)
+      const reader = new FileReader();
+      return new Promise((resolve, reject) => {
+        reader.onload = () => {
+          // For demo, construct the URL that backend will serve
+          resolve(backendUrl);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    } catch (error) {
+      console.error('Error copying file:', error);
+      return `http://localhost:3004/api/v1/media/${file.name}`;
+    }
+  };
+
+  const detectFileType = (fileName: string): string => {
+    const ext = fileName.toLowerCase().split('.').pop();
+    const typeMap: Record<string, string> = {
+      'jpg': 'IMAGE',
+      'jpeg': 'IMAGE',
+      'png': 'IMAGE',
+      'gif': 'IMAGE',
+      'webp': 'IMAGE',
+      'mp4': 'VIDEO',
+      'webm': 'VIDEO',
+      'avi': 'VIDEO',
+      'mp3': 'AUDIO',
+      'wav': 'AUDIO',
+      'txt': 'TEXT',
+      'csv': 'CSV',
+      'pdf': 'PDF',
+      'json': 'JSON',
+    };
+    return typeMap[ext || ''] || 'TEXT';
   };
 
   const parseCSV = (file: File) => {
@@ -149,6 +255,11 @@ export const BatchUpload = () => {
     const validFiles = parsedFiles.filter(f => f.status !== 'error');
     if (validFiles.length === 0) {
       setErrorMessage('All files have errors. Please fix them before uploading.');
+      return false;
+    }
+
+    if (autoAssign && teamMembers.length === 0) {
+      setErrorMessage('No team members assigned to this project. Disable auto-assign or assign team members first.');
       return false;
     }
 
@@ -326,6 +437,33 @@ export const BatchUpload = () => {
               <div className="flex-1 border-t border-gray-300"></div>
             </div>
 
+            {/* Browse Local Files */}
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors">
+              <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium mb-2">Browse Local Files</h3>
+              <p className="text-gray-600 mb-4">
+                Select files from your computer (for demo purposes)
+              </p>
+              <label className="inline-block cursor-pointer">
+                <input
+                  type="file"
+                  multiple
+                  onChange={handleBrowseFiles}
+                  className="hidden"
+                  accept="image/*,video/*,audio/*,.pdf,.txt,.csv,.json"
+                />
+                <span className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors inline-block">
+                  Choose Files
+                </span>
+              </label>
+            </div>
+
+            <div className="flex items-center">
+              <div className="flex-1 border-t border-gray-300"></div>
+              <span className="px-4 text-gray-500">OR</span>
+              <div className="flex-1 border-t border-gray-300"></div>
+            </div>
+
             <button
               onClick={handleManualAdd}
               className="w-full py-3 border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
@@ -340,12 +478,23 @@ export const BatchUpload = () => {
             <h4 className="font-semibold text-sm mb-2">Sample CSV Format:</h4>
             <pre className="text-xs text-gray-700 overflow-x-auto">
 {`file_name,file_type,file_url,external_id
-cat1.jpg,IMAGE,http://localhost:5173/uploads/cat1.jpg,img_001
-dog1.jpg,IMAGE,http://localhost:5173/uploads/dog1.jpg,img_002
-data.csv,CSV,http://localhost:5173/uploads/data.csv,csv_001`}
+sample_image1.jpg,IMAGE,http://localhost:3004/api/v1/media/sample_image1.jpg,img_001
+sample_image2.jpg,IMAGE,http://localhost:3004/api/v1/media/sample_image2.jpg,img_002
+sample_text1.txt,TEXT,http://localhost:3004/api/v1/media/sample_text1.txt,txt_001`}
             </pre>
             <p className="text-xs text-gray-600 mt-2">
               <strong>Supported file types:</strong> IMAGE, VIDEO, AUDIO, TEXT, CSV, PDF, JSON
+            </p>
+            <p className="text-xs text-blue-600 mt-2">
+              <strong>Quick Test:</strong> Download and use{' '}
+              <a 
+                href="/uploads/demo-batch.csv" 
+                download 
+                className="underline hover:text-blue-800"
+              >
+                demo-batch.csv
+              </a>
+              {' '}with pre-configured sample files
             </p>
           </div>
         </div>
@@ -527,6 +676,63 @@ data.csv,CSV,http://localhost:5173/uploads/data.csv,csv_001`}
             )}
           </div>
 
+          {/* Project Team Members */}
+          {projectId && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center">
+                  <Users className="w-5 h-5 text-blue-600 mr-2" />
+                  <h3 className="text-lg font-semibold">Project Team</h3>
+                </div>
+                {teamLoading && (
+                  <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                )}
+              </div>
+              
+              {teamMembers.length === 0 ? (
+                <div className="text-center py-6">
+                  <AlertCircle className="w-12 h-12 mx-auto text-yellow-500 mb-3" />
+                  <p className="text-gray-600 mb-2">No team members assigned to this project</p>
+                  <p className="text-sm text-gray-500">
+                    Please assign annotators or reviewers to the project before uploading batches with auto-assignment.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600 mb-3">
+                    {teamMembers.length} team member{teamMembers.length !== 1 ? 's' : ''} available for task assignment:
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {teamMembers.map((member) => (
+                      <div 
+                        key={member.id} 
+                        className="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm mr-3">
+                          {member.user?.name ? member.user.name.charAt(0).toUpperCase() : (member.user?.email ? member.user.email.charAt(0).toUpperCase() : '?')}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {member.user?.name || member.user?.email || 'Unknown'}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {member.role} • Quota: {member.quota || 'Unlimited'}
+                          </p>
+                        </div>
+                        <div className="text-right ml-2">
+                          <p className="text-xs text-green-600 font-medium">
+                            {member.completedTasks}/{member.assignedTasks}
+                          </p>
+                          <p className="text-xs text-gray-400">tasks</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Quick User Creation */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold mb-2">Need to add users?</h3>
@@ -537,6 +743,10 @@ data.csv,CSV,http://localhost:5173/uploads/data.csv,csv_001`}
               inline={true}
               onUserCreated={(userId, email) => {
                 console.log('User created:', userId, email);
+                // Reload team members after user creation
+                if (projectId) {
+                  loadTeamMembers();
+                }
               }}
             />
           </div>
@@ -551,8 +761,9 @@ data.csv,CSV,http://localhost:5173/uploads/data.csv,csv_001`}
             </button>
             <button
               onClick={handleSubmit}
-              disabled={parsedFiles.length === 0 || !projectId || !batchName}
+              disabled={parsedFiles.length === 0 || !projectId || !batchName.trim() || (autoAssign && teamMembers.length === 0)}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title={parsedFiles.length === 0 ? 'Add files first' : !projectId ? 'Select a project' : !batchName.trim() ? 'Enter batch name' : (autoAssign && teamMembers.length === 0) ? 'Assign team members or disable auto-assign' : 'Create batch'}
             >
               Create Batch & Upload Files
             </button>

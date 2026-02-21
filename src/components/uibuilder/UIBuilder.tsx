@@ -4,19 +4,38 @@
  */
 
 import { useState, useReducer, useCallback } from 'react';
-import { Save, Eye, Undo, Redo, Code, Download, Upload } from 'lucide-react';
+import { Save, Eye, Undo, Redo, Code, Download, Upload, LayoutTemplate } from 'lucide-react';
 import { Button } from '../common';
-import { UIConfiguration, UIBuilderState, UIBuilderAction, PipelineMode, Widget } from '../../types/uiBuilder';
+import { UIConfiguration, UIBuilderState, UIBuilderAction, PipelineMode, Widget, UITemplate } from '../../types/uiBuilder';
 import { WidgetToolbox } from './WidgetToolbox.tsx';
 import { CanvasArea } from './CanvasArea.tsx';
 import { PropertyPanel } from './PropertyPanel.tsx';
 import { PreviewPanel } from './PreviewPanel.tsx';
+import { uiTemplates } from './templates';
 
 interface UIBuilderProps {
   projectId: string;
   initialConfiguration?: UIConfiguration;
   onSave: (configuration: UIConfiguration) => Promise<void>;
   onCancel?: () => void;
+}
+
+// Build default initial configuration
+function buildDefaultConfig(projectId: string): UIConfiguration {
+  return {
+    id: `ui-config-${Date.now()}`,
+    name: 'New UI Configuration',
+    version: 1,
+    projectId,
+    pipelineMode: 'ANNOTATION',
+    fileType: 'TEXT',
+    layout: {
+      type: 'two-column',
+      columns: 2,
+      gap: 16,
+    },
+    widgets: [],
+  };
 }
 
 // Reducer for UI Builder state management
@@ -115,7 +134,8 @@ function uiBuilderReducer(state: UIBuilderState, action: UIBuilderAction): UIBui
           ...state,
           configuration: state.history[newIndex],
           historyIndex: newIndex,
-          isDirty: true,
+          isDirty: newIndex > 0,
+          selectedWidget: null,
         };
       }
       return state;
@@ -129,6 +149,7 @@ function uiBuilderReducer(state: UIBuilderState, action: UIBuilderAction): UIBui
           configuration: state.history[newIndex],
           historyIndex: newIndex,
           isDirty: true,
+          selectedWidget: null,
         };
       }
       return state;
@@ -152,6 +173,37 @@ function uiBuilderReducer(state: UIBuilderState, action: UIBuilderAction): UIBui
       };
     }
 
+    case 'UPDATE_CONFIG_METADATA': {
+      const newConfig = {
+        ...state.configuration,
+        ...action.updates,
+      } as UIConfiguration;
+      return {
+        ...state,
+        configuration: newConfig,
+        isDirty: true,
+        history: [...state.history.slice(0, state.historyIndex + 1), newConfig],
+        historyIndex: state.historyIndex + 1,
+      };
+    }
+
+    case 'LOAD_TEMPLATE': {
+      const templateConfig: UIConfiguration = {
+        ...action.template.configuration,
+        id: `ui-config-${Date.now()}`,
+        projectId: state.configuration.projectId,
+        version: 1,
+      };
+      return {
+        ...state,
+        configuration: templateConfig,
+        history: [templateConfig],
+        historyIndex: 0,
+        isDirty: true,
+        selectedWidget: null,
+      };
+    }
+
     default:
       return state;
   }
@@ -165,26 +217,19 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
 }) => {
   const [showPreview, setShowPreview] = useState(false);
   const [showCodeView, setShowCodeView] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const defaultConfig = buildDefaultConfig(projectId);
 
   const initialState: UIBuilderState = {
-    configuration: initialConfiguration || {
-      id: `ui-config-${Date.now()}`,
-      name: 'New UI Configuration',
-      version: 1,
-      projectId,
-      pipelineMode: 'ANNOTATION',
-      fileType: 'TEXT',
-      layout: {
-        type: 'two-column',
-        columns: 2,
-        gap: 16,
-      },
-      widgets: [],
-    },
+    configuration: initialConfiguration || defaultConfig,
     selectedWidget: null,
     draggedWidget: null,
     clipboard: null,
-    history: [initialConfiguration || ({} as UIConfiguration)],
+    // Fix: initialize history with the same value as configuration
+    history: [initialConfiguration || defaultConfig],
     historyIndex: 0,
     isDirty: false,
     previewMode: 'ANNOTATION',
@@ -194,10 +239,15 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
 
   const handleSave = useCallback(async () => {
     try {
+      setSaveError(null);
+      setSaveSuccess(false);
       await onSave(state.configuration);
       dispatch({ type: 'LOAD_CONFIGURATION', configuration: state.configuration });
-    } catch (error) {
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error: any) {
       console.error('Failed to save UI configuration:', error);
+      setSaveError(error?.message || 'Failed to save configuration');
     }
   }, [state.configuration, onSave]);
 
@@ -226,15 +276,24 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
       };
       reader.readAsText(file);
     }
+    // Reset input so the same file can be imported again
+    event.target.value = '';
+  }, []);
+
+  const handleLoadTemplate = useCallback((template: UITemplate) => {
+    dispatch({ type: 'LOAD_TEMPLATE', template });
+    setShowTemplates(false);
   }, []);
 
   const canUndo = state.historyIndex > 0;
   const canRedo = state.historyIndex < state.history.length - 1;
+  // Allow saving if dirty OR if there are widgets (new config with content)
+  const canSave = state.isDirty || state.configuration.widgets.length > 0;
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Toolbar */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-bold text-gray-900">UI Builder</h1>
           <div className="flex items-center gap-2 pl-4 border-l">
@@ -243,6 +302,7 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
               disabled={!canUndo}
               variant="secondary"
               size="sm"
+              title="Undo"
             >
               <Undo size={16} />
             </Button>
@@ -251,19 +311,52 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
               disabled={!canRedo}
               variant="secondary"
               size="sm"
+              title="Redo"
             >
               <Redo size={16} />
             </Button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Config name editor */}
+          <input
+            type="text"
+            defaultValue={state.configuration.name}
+            key={state.configuration.id}
+            onBlur={(e) => {
+              if (e.target.value !== state.configuration.name) {
+                dispatch({ type: 'UPDATE_CONFIG_METADATA', updates: { name: e.target.value } });
+              }
+            }}
+            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
+            placeholder="Configuration name..."
+          />
+
+          {/* File type */}
+          <select
+            value={state.configuration.fileType}
+            onChange={(e) =>
+              dispatch({ type: 'UPDATE_CONFIG_METADATA', updates: { fileType: e.target.value as any } })
+            }
+            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+          >
+            <option value="TEXT">Text</option>
+            <option value="MARKDOWN">Markdown</option>
+            <option value="IMAGE">Image</option>
+            <option value="AUDIO">Audio</option>
+            <option value="VIDEO">Video</option>
+            <option value="CSV">CSV</option>
+            <option value="PDF">PDF</option>
+          </select>
+
+          {/* Preview mode */}
           <select
             value={state.previewMode}
             onChange={(e) =>
               dispatch({ type: 'SET_PREVIEW_MODE', mode: e.target.value as PipelineMode })
             }
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm"
           >
             <option value="ANNOTATION">Annotation Mode</option>
             <option value="REVIEW">Review Mode</option>
@@ -271,17 +364,26 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
           </select>
 
           <Button
-            onClick={() => setShowPreview(!showPreview)}
+            onClick={() => setShowTemplates(!showTemplates)}
             variant="secondary"
             size="sm"
           >
-            <Eye size={16} className="mr-1" />
-            {showPreview ? 'Hide' : 'Show'} Preview
+            <LayoutTemplate size={16} className="mr-1" />
+            Templates
           </Button>
 
           <Button
-            onClick={() => setShowCodeView(!showCodeView)}
-            variant="secondary"
+            onClick={() => { setShowPreview(!showPreview); setShowCodeView(false); }}
+            variant={showPreview ? 'primary' : 'secondary'}
+            size="sm"
+          >
+            <Eye size={16} className="mr-1" />
+            {showPreview ? 'Hide' : 'Preview'}
+          </Button>
+
+          <Button
+            onClick={() => { setShowCodeView(!showCodeView); setShowPreview(false); }}
+            variant={showCodeView ? 'primary' : 'secondary'}
             size="sm"
           >
             <Code size={16} className="mr-1" />
@@ -289,19 +391,17 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
           </Button>
 
           <div className="border-l pl-2 ml-2 flex gap-2">
-            <label>
+            <label className="cursor-pointer">
               <input
                 type="file"
                 accept=".json"
                 onChange={handleImport}
                 className="hidden"
               />
-              <div className="inline-block">
-                <Button variant="secondary" size="sm">
-                  <Upload size={16} className="mr-1" />
-                  Import
-                </Button>
-              </div>
+              <span className="inline-flex items-center px-3 py-1.5 text-sm font-medium border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer text-gray-700">
+                <Upload size={16} className="mr-1" />
+                Import
+              </span>
             </label>
 
             <Button onClick={handleExport} variant="secondary" size="sm">
@@ -319,19 +419,66 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
             <Button
               onClick={handleSave}
               variant="primary"
-              disabled={!state.isDirty}
+              disabled={!canSave}
             >
               <Save size={16} className="mr-1" />
-              Save Configuration
+              Save
             </Button>
           </div>
         </div>
       </div>
 
+      {/* Save feedback */}
+      {saveError && (
+        <div className="mx-4 mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex-shrink-0">
+          Save failed: {saveError}
+        </div>
+      )}
+      {saveSuccess && (
+        <div className="mx-4 mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-700 flex-shrink-0">
+          Configuration saved successfully!
+        </div>
+      )}
+
+      {/* Templates Overlay */}
+      {showTemplates && (
+        <div className="absolute inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center" onClick={() => setShowTemplates(false)}>
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Choose a Template</h2>
+              <button onClick={() => setShowTemplates(false)} className="text-gray-400 hover:text-gray-600 text-2xl font-bold">×</button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {uiTemplates.map((template) => (
+                <button
+                  key={template.id}
+                  onClick={() => handleLoadTemplate(template)}
+                  className="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all group"
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${getCategoryColor(template.category)}`}>
+                      {getCategoryEmoji(template.category)}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900 group-hover:text-blue-600">{template.name}</h3>
+                      <span className="text-xs text-gray-500 capitalize">{template.category}</span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-600">{template.description}</p>
+                  <div className="mt-3 text-xs text-gray-400">
+                    {template.configuration.widgets.length} widgets
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel - Widget Toolbox */}
-        <div className="w-64 bg-white border-r border-gray-200 overflow-y-auto">
+        <div className="w-64 bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0">
           <WidgetToolbox
             onAddWidget={(widget: Widget) => dispatch({ type: 'ADD_WIDGET', widget })}
           />
@@ -366,7 +513,7 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
 
         {/* Right Panel - Properties or Preview */}
         {showPreview ? (
-          <div className="w-96 bg-white border-l border-gray-200 overflow-y-auto">
+          <div className="w-[480px] bg-white border-l border-gray-200 overflow-y-auto flex-shrink-0">
             <PreviewPanel
               configuration={state.configuration}
               pipelineMode={state.previewMode}
@@ -374,7 +521,7 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
           </div>
         ) : (
           state.selectedWidget && (
-            <div className="w-96 bg-white border-l border-gray-200 overflow-y-auto">
+            <div className="w-96 bg-white border-l border-gray-200 overflow-y-auto flex-shrink-0">
               <PropertyPanel
                 widget={state.selectedWidget}
                 onUpdate={(updates: Partial<Widget>) =>
@@ -394,17 +541,43 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
       </div>
 
       {/* Status Bar */}
-      <div className="bg-gray-100 border-t border-gray-200 px-4 py-2 flex items-center justify-between text-sm text-gray-600">
+      <div className="bg-gray-100 border-t border-gray-200 px-4 py-2 flex items-center justify-between text-sm text-gray-600 flex-shrink-0">
         <div className="flex items-center gap-4">
           <span>Widgets: {state.configuration.widgets.length}</span>
           <span>Layout: {state.configuration.layout.type}</span>
           <span>File Type: {state.configuration.fileType}</span>
+          <span>Mode: {state.previewMode}</span>
         </div>
         <div className="flex items-center gap-4">
-          {state.isDirty && <span className="text-orange-600">● Unsaved changes</span>}
+          {state.isDirty && <span className="text-orange-600 font-medium">● Unsaved changes</span>}
+          {!state.isDirty && state.configuration.widgets.length > 0 && (
+            <span className="text-green-600">✓ Saved</span>
+          )}
           <span>Version: {state.configuration.version}</span>
         </div>
       </div>
     </div>
   );
 };
+
+function getCategoryColor(category: string): string {
+  const colors: Record<string, string> = {
+    text: 'bg-blue-100 text-blue-600',
+    image: 'bg-green-100 text-green-600',
+    audio: 'bg-purple-100 text-purple-600',
+    video: 'bg-red-100 text-red-600',
+    'multi-modal': 'bg-orange-100 text-orange-600',
+  };
+  return colors[category] || 'bg-gray-100 text-gray-600';
+}
+
+function getCategoryEmoji(category: string): string {
+  const emojis: Record<string, string> = {
+    text: '📝',
+    image: '🖼️',
+    audio: '🎵',
+    video: '🎬',
+    'multi-modal': '🔀',
+  };
+  return emojis[category] || '📋';
+}

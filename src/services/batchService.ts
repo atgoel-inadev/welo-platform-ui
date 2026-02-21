@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_BASE = 'http://localhost:3004/api/v1';
+import { projectManagementApi, taskManagementApi } from '../lib/apiClient';
 
 /**
  * Batch Service DTOs
@@ -75,224 +73,109 @@ export interface Task {
 
 /**
  * Batch Service API Client
+ * Uses centralized apiClient instances for automatic token injection and error handling.
+ * Batch CRUD and management endpoints are on project-management service (port 3004).
+ * Task listing by batch uses task-management service (port 3003).
  */
 class BatchService {
-  private getAuthHeaders() {
-    const token = localStorage.getItem('accessToken');
-    return {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-    };
-  }
-
   /**
    * Create a new batch
    */
   async createBatch(dto: CreateBatchDto): Promise<Batch> {
-    try {
-      const response = await axios.post(
-        `${API_BASE}/batches`,
-        dto,
-        { headers: this.getAuthHeaders() }
-      );
-      return response.data;
-    } catch (error: any) {
-      console.error('Failed to create batch:', error);
-      throw new Error(error.response?.data?.message || 'Failed to create batch');
-    }
+    return projectManagementApi.post<Batch>('/batches', dto);
   }
 
   /**
    * Allocate files to a batch and create tasks
    */
   async allocateFiles(batchId: string, dto: AllocateFilesDto): Promise<Task[]> {
-    try {
-      const response = await axios.post(
-        `${API_BASE}/batches/${batchId}/allocate-files`,
-        dto,
-        { headers: this.getAuthHeaders() }
-      );
-      return response.data;
-    } catch (error: any) {
-      console.error('Failed to allocate files:', error);
-      throw new Error(error.response?.data?.message || 'Failed to allocate files');
-    }
+    return projectManagementApi.post<Task[]>(`/batches/${batchId}/allocate-files`, dto);
   }
 
   /**
    * Get batch statistics
    */
   async getBatchStatistics(batchId: string): Promise<BatchStatistics> {
-    try {
-      const response = await axios.get(
-        `${API_BASE}/batches/${batchId}/statistics`,
-        { headers: this.getAuthHeaders() }
-      );
-      return response.data;
-    } catch (error: any) {
-      console.error('Failed to get batch statistics:', error);
-      throw new Error(error.response?.data?.message || 'Failed to get batch statistics');
-    }
+    return projectManagementApi.get<BatchStatistics>(`/batches/${batchId}/statistics`);
   }
 
   /**
    * List batches (optionally filtered by projectId)
    */
   async listBatches(projectId?: string): Promise<Batch[]> {
-    try {
-      const params = projectId ? { projectId } : {};
-      const response = await axios.get(
-        `${API_BASE}/batches`,
-        { 
-          headers: this.getAuthHeaders(),
-          params 
-        }
-      );
-      return response.data;
-    } catch (error: any) {
-      console.error('Failed to list batches:', error);
-      throw new Error(error.response?.data?.message || 'Failed to list batches');
-    }
+    const params = projectId ? { params: { projectId } } : undefined;
+    return projectManagementApi.get<Batch[]>('/batches', params);
   }
 
   /**
    * Get a single batch by ID
    */
   async getBatch(batchId: string): Promise<Batch> {
-    try {
-      const response = await axios.get(
-        `${API_BASE}/batches/${batchId}`,
-        { headers: this.getAuthHeaders() }
-      );
-      return response.data;
-    } catch (error: any) {
-      console.error('Failed to get batch:', error);
-      throw new Error(error.response?.data?.message || 'Failed to get batch');
-    }
+    return projectManagementApi.get<Batch>(`/batches/${batchId}`);
   }
 
   /**
    * Update batch
    */
   async updateBatch(batchId: string, updates: Partial<CreateBatchDto>): Promise<Batch> {
-    try {
-      const response = await axios.patch(
-        `${API_BASE}/batches/${batchId}`,
-        updates,
-        { headers: this.getAuthHeaders() }
-      );
-      return response.data;
-    } catch (error: any) {
-      console.error('Failed to update batch:', error);
-      throw new Error(error.response?.data?.message || 'Failed to update batch');
-    }
+    return projectManagementApi.patch<Batch>(`/batches/${batchId}`, updates);
   }
 
   /**
    * Complete a batch
    */
   async completeBatch(batchId: string): Promise<Batch> {
-    try {
-      const response = await axios.post(
-        `${API_BASE}/batches/${batchId}/complete`,
-        {},
-        { headers: this.getAuthHeaders() }
-      );
-      return response.data;
-    } catch (error: any) {
-      console.error('Failed to complete batch:', error);
-      throw new Error(error.response?.data?.message || 'Failed to complete batch');
-    }
+    return projectManagementApi.post<Batch>(`/batches/${batchId}/complete`, {});
   }
 
   /**
-   * Get tasks for a batch
+   * Get tasks for a batch (from task-management service)
    */
   async getBatchTasks(batchId: string): Promise<Task[]> {
-    try {
-      const response = await axios.get(
-        `${API_BASE}/tasks`,
-        { 
-          headers: this.getAuthHeaders(),
-          params: { batchId }
-        }
-      );
-      return response.data;
-    } catch (error: any) {
-      console.error('Failed to get batch tasks:', error);
-      throw new Error(error.response?.data?.message || 'Failed to get batch tasks');
-    }
+    return taskManagementApi.get<Task[]>('/tasks', {
+      params: { batchId },
+    });
   }
 
   /**
    * Manual task assignment
    */
   async assignTask(taskId: string, userId: string, workflowStage: string = 'annotation'): Promise<Task> {
-    try {
-      const response = await axios.post(
-        `${API_BASE}/batches/assign-task`,
-        { taskId, userId, workflowStage },
-        { headers: this.getAuthHeaders() }
-      );
-      return response.data;
-    } catch (error: any) {
-      console.error('Failed to assign task:', error);
-      throw new Error(error.response?.data?.message || 'Failed to assign task');
-    }
+    return projectManagementApi.post<Task>('/batches/assign-task', {
+      taskId,
+      userId,
+      workflowStage,
+    });
   }
 
   /**
    * Auto-assign unassigned tasks in a batch
    */
   async autoAssignTasks(
-    batchId: string, 
+    batchId: string,
     method: 'AUTO_ROUND_ROBIN' | 'AUTO_WORKLOAD_BASED' | 'AUTO_SKILL_BASED' = 'AUTO_ROUND_ROBIN'
   ): Promise<{ assignedCount: number; tasks: Task[] }> {
-    try {
-      const response = await axios.post(
-        `${API_BASE}/batches/${batchId}/auto-assign`,
-        { assignmentMethod: method },
-        { headers: this.getAuthHeaders() }
-      );
-      return response.data;
-    } catch (error: any) {
-      console.error('Failed to auto-assign tasks:', error);
-      throw new Error(error.response?.data?.message || 'Failed to auto-assign tasks');
-    }
+    return projectManagementApi.post<{ assignedCount: number; tasks: Task[] }>(
+      `/batches/${batchId}/auto-assign`,
+      { assignmentMethod: method },
+    );
   }
 
   /**
    * Reassign a task to a different user
    */
   async reassignTask(taskId: string, newUserId: string): Promise<Task> {
-    try {
-      const response = await axios.post(
-        `${API_BASE}/batches/reassign-task`,
-        { taskId, newUserId },
-        { headers: this.getAuthHeaders() }
-      );
-      return response.data;
-    } catch (error: any) {
-      console.error('Failed to reassign task:', error);
-      throw new Error(error.response?.data?.message || 'Failed to reassign task');
-    }
+    return projectManagementApi.post<Task>('/batches/reassign-task', {
+      taskId,
+      newUserId,
+    });
   }
 
   /**
    * Unassign a task
    */
   async unassignTask(taskId: string): Promise<Task> {
-    try {
-      const response = await axios.post(
-        `${API_BASE}/batches/unassign-task`,
-        { taskId },
-        { headers: this.getAuthHeaders() }
-      );
-      return response.data;
-    } catch (error: any) {
-      console.error('Failed to unassign task:', error);
-      throw new Error(error.response?.data?.message || 'Failed to unassign task');
-    }
+    return projectManagementApi.post<Task>('/batches/unassign-task', { taskId });
   }
 }
 

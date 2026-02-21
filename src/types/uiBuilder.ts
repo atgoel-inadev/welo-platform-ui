@@ -294,4 +294,5 @@ export type UIBuilderAction =
   | { type: 'SET_PREVIEW_MODE'; mode: PipelineMode }
   | { type: 'LOAD_CONFIGURATION'; configuration: UIConfiguration }
   | { type: 'SAVE_CONFIGURATION' }
-  | { type: 'LOAD_TEMPLATE'; template: UITemplate };
+  | { type: 'LOAD_TEMPLATE'; template: UITemplate }
+  | { type: 'UPDATE_CONFIG_METADATA'; updates: Partial<Pick<UIConfiguration, 'name' | 'fileType' | 'pipelineMode' | 'layout'>> };

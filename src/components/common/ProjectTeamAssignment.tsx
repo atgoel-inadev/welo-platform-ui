@@ -303,11 +303,11 @@ export const ProjectTeamAssignment: React.FC<ProjectTeamAssignmentProps> = ({
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm">
-                        {member.user?.name.charAt(0).toUpperCase() || '?'}
+                        {member.user?.name ? member.user.name.charAt(0).toUpperCase() : (member.user?.email ? member.user.email.charAt(0).toUpperCase() : '?')}
                       </div>
                       <div className="ml-3">
                         <div className="text-sm font-medium text-gray-900">
-                          {member.user?.name || 'Unknown User'}
+                          {member.user?.name || member.user?.email || 'Unknown User'}
                         </div>
                         <div className="text-sm text-gray-500">
                           {member.user?.email || '—'}

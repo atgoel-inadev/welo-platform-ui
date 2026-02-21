@@ -179,27 +179,45 @@ export interface ConsensusData {
  */
 export class TaskService {
   /**
-   * Get tasks assigned to current user
+   * Get tasks assigned to current user.
+   * Backend listTasks returns { tasks, total, page, pageSize } — not a { success, data } envelope.
+   * Tasks are wrapped as Assignment-shaped objects so TaskQueue can render them.
    */
   async getMyTasks(userId: string, status?: 'ASSIGNED' | 'IN_PROGRESS'): Promise<Assignment[]> {
     const queryParams = new URLSearchParams();
-    queryParams.append('assignedTo', userId);
     if (status) queryParams.append('status', status);
 
     const url = `/tasks?${queryParams.toString()}`;
-    const response = await taskManagementApi.get<BackendResponse<Assignment[]>>(url);
-    return response.data;
+    const response = await taskManagementApi.get<{ tasks: Task[]; total: number; page: number; pageSize: number }>(url);
+    const tasks: Task[] = response.tasks || [];
+
+    // Wrap each task as an Assignment so TaskQueue can iterate over assignment.task
+    return tasks.map((task) => ({
+      id: task.id,
+      taskId: task.id,
+      userId,
+      workflowStage: 'ANNOTATION',
+      status: 'ASSIGNED' as const,
+      assignedAt: task.createdAt,
+      expiresAt: new Date(Date.now() + 28_800_000).toISOString(),
+      assignmentMethod: 'AUTOMATIC' as const,
+      task,
+    }));
   }
 
   /**
-   * Pull next available task from queue (FIFO)
+   * Pull next available task from queue (FIFO).
+   * Backend returns the raw Task entity directly (not wrapped in { success, data }).
+   * On no tasks: returns { message, task: null }.
    */
   async pullNextTask(dto: GetNextTaskDto): Promise<Task | null> {
     try {
-      const response = await taskManagementApi.post<BackendResponse<Task>>('/tasks/next', dto);
-      return response.data;
+      const response = await taskManagementApi.post<Task | { message: string; task: null }>('/tasks/next', dto);
+      if (!response || (response as any).task === null || (response as any).message === 'No available tasks') {
+        return null;
+      }
+      return response as Task;
     } catch (error: any) {
-      // Return null if no tasks available
       if (error.message?.includes('No available tasks')) {
         return null;
       }
@@ -208,46 +226,49 @@ export class TaskService {
   }
 
   /**
-   * Get detailed task information
+   * Get detailed task information.
+   * Backend returns the raw Task entity directly.
    */
   async getTaskDetails(taskId: string): Promise<Task> {
-    const response = await taskManagementApi.get<BackendResponse<Task>>(`/tasks/${taskId}`);
-    return response.data;
+    const response = await taskManagementApi.get<Task>(`/tasks/${taskId}`);
+    return response;
   }
 
   /**
    * Submit task with annotation data
    */
   async submitTask(taskId: string, dto: SubmitTaskDto): Promise<{ success: boolean; message: string }> {
-    const response = await taskManagementApi.post<BackendResponse<any>>(`/tasks/${taskId}/submit`, dto);
+    const response = await taskManagementApi.post<any>(`/tasks/${taskId}/submit`, dto);
     return {
-      success: response.success,
-      message: response.message || 'Task submitted successfully',
+      success: true,
+      message: (response as any)?.message || 'Task submitted successfully',
     };
   }
 
   /**
    * Update task status (skip, hold, etc.)
+   * Backend returns the raw Task entity directly.
    */
   async updateTaskStatus(taskId: string, dto: UpdateTaskStatusDto): Promise<Task> {
-    const response = await taskManagementApi.patch<BackendResponse<Task>>(`/tasks/${taskId}/status`, dto);
-    return response.data;
+    const response = await taskManagementApi.patch<Task>(`/tasks/${taskId}/status`, dto);
+    return response;
   }
 
   /**
    * Get task statistics
    */
   async getTaskStatistics(taskId: string): Promise<TaskStatistics> {
-    const response = await taskManagementApi.get<BackendResponse<TaskStatistics>>(`/tasks/${taskId}/statistics`);
-    return response.data;
+    const response = await taskManagementApi.get<TaskStatistics>(`/tasks/${taskId}/statistics`);
+    return response;
   }
 
   /**
-   * List tasks with filters
+   * List tasks with filters.
+   * Backend returns { tasks, total, page, pageSize } — not a { success, data } envelope.
    */
   async listTasks(filters: TaskFilterDto): Promise<PaginatedResponse<Task>> {
     const queryParams = new URLSearchParams();
-    
+
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
         queryParams.append(key, value.toString());
@@ -255,13 +276,13 @@ export class TaskService {
     });
 
     const url = `/tasks?${queryParams.toString()}`;
-    const response = await taskManagementApi.get<BackendResponse<Task[]>>(url);
+    const response = await taskManagementApi.get<{ tasks: Task[]; total: number; page: number; pageSize: number }>(url);
 
     return {
-      data: response.data,
-      total: response.pagination?.totalItems || 0,
-      page: response.pagination?.page || 1,
-      limit: response.pagination?.pageSize || 10,
+      data: response.tasks || [],
+      total: response.total || 0,
+      page: response.page || 1,
+      limit: response.pageSize || 10,
     };
   }
 
@@ -300,36 +321,43 @@ export class TaskService {
    */
 
   /**
-   * Get tasks for review (tasks with status PENDING_REVIEW or REVIEW_IN_PROGRESS)
+   * Get tasks for review — tasks that have been annotated (status = SUBMITTED).
+   * Backend returns { tasks, total, page, pageSize } — not a { success, data } envelope.
+   * The taskType filter is intentionally NOT used because all tasks are ANNOTATION type;
+   * instead we filter by status SUBMITTED (annotation done, awaiting review).
    */
   async getTasksForReview(_userId: string, filters?: Partial<TaskFilterDto>): Promise<Task[]> {
-    const response = await taskManagementApi.get<BackendResponse<PaginatedResponse<Task>>>('/tasks', {
-      params: {
-        taskType: 'REVIEW',
-        ...filters,
-      },
-    });
-    return response.data.data;
+    const params: Record<string, any> = {
+      status: filters?.status || 'SUBMITTED',
+    };
+    if (filters?.projectId) params.projectId = filters.projectId;
+    if (filters?.batchId) params.batchId = filters.batchId;
+    if (filters?.page) params.page = filters.page;
+    if (filters?.pageSize) params.pageSize = filters.pageSize;
+
+    const response = await taskManagementApi.get<{ tasks: Task[]; total: number }>('/tasks', { params });
+    return response.tasks || [];
   }
 
   /**
-   * Get all annotations for a specific task (for comparison/consensus)
+   * Get all annotations for a specific task (for comparison/consensus).
+   * Backend returns array directly.
    */
   async getTaskAnnotations(taskId: string): Promise<TaskAnnotation[]> {
-    const response = await taskManagementApi.get<BackendResponse<TaskAnnotation[]>>(
+    const response = await taskManagementApi.get<TaskAnnotation[]>(
       `/tasks/${taskId}/annotations`
     );
-    return response.data;
+    return Array.isArray(response) ? response : [];
   }
 
   /**
    * Get consensus data for a task (agreement analysis between annotators)
    */
   async getTaskConsensus(taskId: string): Promise<ConsensusData> {
-    const response = await taskManagementApi.get<BackendResponse<ConsensusData>>(
+    const response = await taskManagementApi.get<ConsensusData>(
       `/tasks/${taskId}/consensus`
     );
-    return response.data;
+    return response;
   }
 
   /**
@@ -392,10 +420,10 @@ export class TaskService {
    * Get task statistics including quality metrics
    */
   async getTaskQualityMetrics(taskId: string): Promise<TaskStatistics> {
-    const response = await taskManagementApi.get<BackendResponse<TaskStatistics>>(
+    const response = await taskManagementApi.get<TaskStatistics>(
       `/tasks/${taskId}/statistics`
     );
-    return response.data;
+    return response;
   }
 }
 
