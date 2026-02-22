@@ -715,7 +715,10 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
             </div>
             <div className="flex-1 overflow-auto p-4">
               {fileUrl ? (
-                <FileViewer fileUrl={fileUrl} />
+                <FileViewer 
+                  fileUrl={fileUrl} 
+                  metadata={config.taskData?.metadata}
+                />
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-400">
                   <div className="text-center">
@@ -908,7 +911,10 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
           </div>
           <div className="flex-1 overflow-auto p-4">
             {fileUrl ? (
-              <FileViewer fileUrl={fileUrl} />
+              <FileViewer 
+                fileUrl={fileUrl} 
+                metadata={config.taskData?.metadata}
+              />
             ) : (
               <div className="flex items-center justify-center h-full text-gray-400">
                 <div className="text-center">

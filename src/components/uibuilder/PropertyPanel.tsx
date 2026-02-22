@@ -18,6 +18,40 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({ widget, onUpdate, 
 
   const renderBasicProperties = () => (
     <div className="space-y-4">
+      {/* Size Preset */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Widget Size</label>
+        <select
+          value={widget.sizePreset || 'medium'}
+          onChange={(e) => onUpdate({ sizePreset: e.target.value as any })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+        >
+          <option value="small">Small (300px)</option>
+          <option value="medium">Medium (500px)</option>
+          <option value="large">Large (700px)</option>
+          <option value="full-width">Full Width</option>
+          <option value="custom">Custom</option>
+        </select>
+        {widget.sizePreset === 'custom' && (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <FormInput
+              label="Width (px)"
+              type="number"
+              value={widget.size.width}
+              onChange={(e) => onUpdate({ size: { ...widget.size, width: parseInt(e.target.value) } })}
+              min={50}
+            />
+            <FormInput
+              label="Height (px)"
+              type="number"
+              value={widget.size.height}
+              onChange={(e) => onUpdate({ size: { ...widget.size, height: parseInt(e.target.value) } })}
+              min={30}
+            />
+          </div>
+        )}
+      </div>
+
       <FormInput
         label="Label"
         value={widget.label || ''}
@@ -103,6 +137,62 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({ widget, onUpdate, 
               value={(widget as any).maxLength || ''}
               onChange={(e) => onUpdate({ maxLength: parseInt(e.target.value) } as any)}
             />
+          </div>
+        );
+
+      case 'QUESTION':
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Render Mode</label>
+              <select
+                value={(widget as any).renderMode || 'paginated'}
+                onChange={(e) => onUpdate({ renderMode: e.target.value } as any)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              >
+                <option value="paginated">Paginated (One question at a time)</option>
+                <option value="all">All Questions</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {(widget as any).renderMode === 'paginated' 
+                  ? 'Users navigate through questions one at a time with Next/Previous buttons'
+                  : 'All questions from project configuration displayed at once'}
+              </p>
+            </div>
+
+            {(widget as any).renderMode === 'paginated' && (
+              <>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={(widget as any).showProgress !== false}
+                    onChange={(e) => onUpdate({ showProgress: e.target.checked } as any)}
+                    className="mr-2"
+                  />
+                  <span className="text-sm text-gray-700">Show progress (e.g., "Question 2 of 5")</span>
+                </label>
+
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={(widget as any).showNavigation !== false}
+                    onChange={(e) => onUpdate({ showNavigation: e.target.checked } as any)}
+                    className="mr-2"
+                  />
+                  <span className="text-sm text-gray-700">Show Next/Previous buttons</span>
+                </label>
+              </>
+            )}
+
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <span className="text-blue-600">ℹ️</span>
+                <div className="text-xs text-gray-700">
+                  <strong>Note:</strong> This widget automatically renders questions from the project configuration. 
+                  Questions are pulled from the "annotationQuestions" field in the project settings.
+                </div>
+              </div>
+            </div>
           </div>
         );
 

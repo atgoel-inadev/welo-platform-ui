@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+import { taskManagementApi } from '../lib/apiClient';
 
 export interface AnnotationResponse {
   questionId: string;
@@ -75,21 +73,15 @@ export class TaskRenderingService {
    */
   async getTaskRenderConfig(taskId: string, userId: string): Promise<TaskRenderConfig> {
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}/tasks/${taskId}/render-config`,
-        {
-          params: { userId },
-          headers: {
-            'Content-Type': 'application/json',
-            // TODO: Add auth token
-            // 'Authorization': `Bearer ${getAuthToken()}`,
-          },
-        },
+      const params = new URLSearchParams();
+      params.append('userId', userId);
+      const response = await taskManagementApi.get<TaskRenderConfig>(
+        `/tasks/${taskId}/render-config?${params.toString()}`
       );
-      return response.data;
+      return response;
     } catch (error: any) {
       console.error('Failed to get task render config:', error);
-      throw new Error(error.response?.data?.message || 'Failed to load task configuration');
+      throw error;
     }
   }
 
@@ -103,21 +95,15 @@ export class TaskRenderingService {
    */
   async saveAnnotation(taskId: string, userId: string, data: SaveAnnotationDto): Promise<void> {
     try {
-      await axios.post(
-        `${API_BASE_URL}/tasks/${taskId}/annotation`,
-        data,
-        {
-          params: { userId },
-          headers: {
-            'Content-Type': 'application/json',
-            // TODO: Add auth token
-            // 'Authorization': `Bearer ${getAuthToken()}`,
-          },
-        },
+      const params = new URLSearchParams();
+      params.append('userId', userId);
+      await taskManagementApi.post(
+        `/tasks/${taskId}/annotation?${params.toString()}`,
+        data
       );
     } catch (error: any) {
       console.error('Failed to save annotation:', error);
-      throw new Error(error.response?.data?.message || 'Failed to save annotation');
+      throw error;
     }
   }
 
@@ -131,21 +117,15 @@ export class TaskRenderingService {
    */
   async saveReview(taskId: string, userId: string, data: SaveReviewDto): Promise<void> {
     try {
-      await axios.post(
-        `${API_BASE_URL}/tasks/${taskId}/review`,
-        data,
-        {
-          params: { userId },
-          headers: {
-            'Content-Type': 'application/json',
-            // TODO: Add auth token
-            // 'Authorization': `Bearer ${getAuthToken()}`,
-          },
-        },
+      const params = new URLSearchParams();
+      params.append('userId', userId);
+      await taskManagementApi.post(
+        `/tasks/${taskId}/review?${params.toString()}`,
+        data
       );
     } catch (error: any) {
       console.error('Failed to save review:', error);
-      throw new Error(error.response?.data?.message || 'Failed to save review');
+      throw error;
     }
   }
 
@@ -157,20 +137,13 @@ export class TaskRenderingService {
    */
   async getAnnotationHistory(taskId: string): Promise<AnnotationHistory> {
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}/tasks/${taskId}/annotation-history`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            // TODO: Add auth token
-            // 'Authorization': `Bearer ${getAuthToken()}`,
-          },
-        },
+      const response = await taskManagementApi.get<AnnotationHistory>(
+        `/tasks/${taskId}/annotation-history`
       );
-      return response.data;
+      return response;
     } catch (error: any) {
       console.error('Failed to get annotation history:', error);
-      throw new Error(error.response?.data?.message || 'Failed to load annotation history');
+      throw error;
     }
   }
 }

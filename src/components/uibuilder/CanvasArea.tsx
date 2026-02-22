@@ -1,11 +1,11 @@
 /**
- * Canvas Area Component
+ * Canvas Area Component - Improved with Flex/Grid Layout
  * Main editing canvas for positioning and arranging widgets
  */
 
-import { useRef, useState, useCallback } from 'react';
-import { Trash2, Copy, Move } from 'lucide-react';
-import { UIConfiguration, Widget, Position, Size } from '../../types/uiBuilder';
+import { useState, useCallback } from 'react';
+import { Trash2, MoveUp, MoveDown, ChevronRight } from 'lucide-react';
+import { UIConfiguration, Widget, QuestionWidget } from '../../types/uiBuilder';
 
 interface CanvasAreaProps {
   configuration: UIConfiguration;
@@ -13,59 +13,18 @@ interface CanvasAreaProps {
   onSelectWidget: (widgetId: string | null) => void;
   onUpdateWidget: (widgetId: string, updates: Partial<Widget>) => void;
   onDeleteWidget: (widgetId: string) => void;
-  onMoveWidget: (widgetId: string, position: Position) => void;
-  onResizeWidget: (widgetId: string, size: Size) => void;
+  onMoveWidget: (widgetId: string, position: { x: number; y: number }) => void;
+  onResizeWidget: (widgetId: string, size: { width: number; height: number }) => void;
 }
 
 export const CanvasArea: React.FC<CanvasAreaProps> = ({
   configuration,
   selectedWidget,
   onSelectWidget,
-  onUpdateWidget: _onUpdateWidget,
+  onUpdateWidget,
   onDeleteWidget,
-  onMoveWidget,
-  onResizeWidget: _onResizeWidget,
 }) => {
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const [draggingWidget, setDraggingWidget] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState<Position>({ x: 0, y: 0 });
-
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent, widget: Widget) => {
-      if (e.button !== 0) return; // Only left click
-
-      e.stopPropagation();
-      onSelectWidget(widget.id);
-
-      const rect = (e.target as HTMLElement).getBoundingClientRect();
-      setDragOffset({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      });
-      setDraggingWidget(widget.id);
-    },
-    [onSelectWidget]
-  );
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (!draggingWidget || !canvasRef.current) return;
-
-      const canvasRect = canvasRef.current.getBoundingClientRect();
-      const newX = e.clientX - canvasRect.left - dragOffset.x;
-      const newY = e.clientY - canvasRect.top - dragOffset.y;
-
-      onMoveWidget(draggingWidget, {
-        x: Math.max(0, Math.min(newX, canvasRect.width - 100)),
-        y: Math.max(0, Math.min(newY, canvasRect.height - 50)),
-      });
-    },
-    [draggingWidget, dragOffset, onMoveWidget]
-  );
-
-  const handleMouseUp = useCallback(() => {
-    setDraggingWidget(null);
-  }, []);
+  const [hoveredWidget, setHoveredWidget] = useState<string | null>(null);
 
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
@@ -76,32 +35,199 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
     [onSelectWidget]
   );
 
+  const handleMoveUp = useCallback(
+    (widget: Widget) => {
+      // Work with sorted widgets to get the actual visual order
+      const sortedWidgets = [...configuration.widgets].sort((a, b) => a.order - b.order);
+      const currentIndex = sortedWidgets.findIndex((w) => w.id === widget.id);
+      
+      if (currentIndex > 0) {
+        const prevWidget = sortedWidgets[currentIndex - 1];
+        // Swap order values
+        onUpdateWidget(widget.id, { order: prevWidget.order });
+        onUpdateWidget(prevWidget.id, { order: widget.order });
+      }
+    },
+    [configuration.widgets, onUpdateWidget]
+  );
+
+  const handleMoveDown = useCallback(
+    (widget: Widget) => {
+      // Work with sorted widgets to get the actual visual order
+      const sortedWidgets = [...configuration.widgets].sort((a, b) => a.order - b.order);
+      const currentIndex = sortedWidgets.findIndex((w) => w.id === widget.id);
+      
+      if (currentIndex < sortedWidgets.length - 1) {
+        const nextWidget = sortedWidgets[currentIndex + 1];
+        // Swap order values
+        onUpdateWidget(widget.id, { order: nextWidget.order });
+        onUpdateWidget(nextWidget.id, { order: widget.order });
+      }
+    },
+    [configuration.widgets, onUpdateWidget]
+  );
+
+  const getContainerStyle = (): React.CSSProperties => {
+    const layout = configuration.layout;
+    
+    switch (layout.type) {
+      case 'grid':
+        return {
+          display: 'grid',
+          gridTemplateColumns: `repeat(${layout.columns || 2}, 1fr)`,
+          gap: `${layout.gap || 16}px`,
+          maxWidth: `${layout.maxWidth || 1200}px`,
+          margin: '0 auto',
+        };
+      case 'flex-vertical':
+        return {
+          display: 'flex',
+          flexDirection: 'column',
+          gap: `${layout.gap || 16}px`,
+          maxWidth: `${layout.maxWidth || 800}px`,
+          margin: '0 auto',
+        };
+      case 'flex-horizontal':
+        return {
+          display: 'flex',
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: `${layout.gap || 16}px`,
+          maxWidth: `${layout.maxWidth || 1200}px`,
+          margin: '0 auto',
+        };
+      case 'two-column':
+        return {
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: `${layout.gap || 16}px`,
+          maxWidth: `${layout.maxWidth || 1200}px`,
+          margin: '0 auto',
+        };
+      case 'three-column':
+        return {
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr 1fr',
+          gap: `${layout.gap || 16}px`,
+          maxWidth: `${layout.maxWidth || 1200}px`,
+          margin: '0 auto',
+        };
+      default:
+        return {
+          display: 'flex',
+          flexDirection: 'column',
+          gap: `${layout.gap || 16}px`,
+          maxWidth: `${layout.maxWidth || 800}px`,
+          margin: '0 auto',
+        };
+    }
+  };
+
   const getWidgetStyle = (widget: Widget): React.CSSProperties => {
-    return {
-      position: 'absolute',
-      left: `${widget.position.x}px`,
-      top: `${widget.position.y}px`,
-      width: `${widget.size.width}px`,
-      minHeight: `${widget.size.height}px`,
+    const baseStyle: React.CSSProperties = {
       border: selectedWidget?.id === widget.id ? '2px solid #3B82F6' : '1px solid #E5E7EB',
-      borderRadius: '4px',
+      borderRadius: '8px',
       backgroundColor: 'white',
-      padding: '12px',
-      cursor: draggingWidget === widget.id ? 'grabbing' : 'grab',
+      padding: '16px',
+      minHeight: '60px',
       boxShadow: selectedWidget?.id === widget.id 
         ? '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-        : '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-      transition: draggingWidget === widget.id ? 'none' : 'all 0.2s',
+        : hoveredWidget === widget.id
+        ? '0 2px 4px rgba(0, 0, 0, 0.08)'
+        : '0 1px 2px rgba(0, 0, 0, 0.05)',
+      cursor: 'pointer',
+      transition: 'all 0.2s',
+      position: 'relative',
       ...widget.style,
     };
+
+    // Apply size preset
+    if (widget.sizePreset) {
+      switch (widget.sizePreset) {
+        case 'small':
+          baseStyle.width = '300px';
+          baseStyle.maxWidth = '100%';
+          break;
+        case 'medium':
+          baseStyle.width = '500px';
+          baseStyle.maxWidth = '100%';
+          break;
+        case 'large':
+          baseStyle.width = '700px';
+          baseStyle.maxWidth = '100%';
+          break;
+        case 'full-width':
+          baseStyle.width = '100%';
+          baseStyle.gridColumn = 'span 1 / -1'; // Span all columns in grid
+          break;
+        case 'custom':
+          baseStyle.width = `${widget.size.width}px`;
+          baseStyle.minHeight = `${widget.size.height}px`;
+          break;
+      }
+    }
+
+    return baseStyle;
   };
 
   const renderWidgetPreview = (widget: Widget) => {
     switch (widget.type) {
       case 'FILE_VIEWER':
         return (
-          <div className="flex items-center justify-center h-full bg-gray-50 rounded">
-            <span className="text-gray-400 text-sm">File Viewer Area</span>
+          <div className="flex items-center justify-center h-48 bg-gradient-to-br from-gray-50 to-gray-100 rounded border-2 border-dashed border-gray-300">
+            <div className="text-center">
+              <div className="text-4xl mb-2">📁</div>
+              <span className="text-gray-600 font-medium">File Viewer Area</span>
+              <p className="text-xs text-gray-500 mt-1">File content will be displayed here</p>
+            </div>
+          </div>
+        );
+
+      case 'QUESTION':
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="text-sm text-gray-500 mb-1">Question Widget</div>
+                <div className="text-xs text-gray-400">
+                  {(widget as QuestionWidget).renderMode === 'paginated' ? '📄 Paginated' : '📋 All Questions'}
+                </div>
+              </div>
+              {(widget as QuestionWidget).showProgress && (
+                <div className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                  Question 1 of {'{N}'}
+                </div>
+              )}
+            </div>
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="font-medium text-gray-900 mb-3">
+                Example: What is the sentiment of this text? <span className="text-red-500">*</span>
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input type="radio" className="mr-2" disabled />
+                  <span className="text-sm">Positive</span>
+                </label>
+                <label className="flex items-center">
+                  <input type="radio" className="mr-2" disabled />
+                  <span className="text-sm">Negative</span>
+                </label>
+                <label className="flex items-center">
+                  <input type="radio" className="mr-2" disabled />
+                  <span className="text-sm">Neutral</span>
+                </label>
+              </div>
+            </div>
+            {(widget as QuestionWidget).showNavigation && (
+              <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
+                <button className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-md" disabled>
+                  Previous
+                </button>
+                <button className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md flex items-center gap-2" disabled>
+                  Next <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
           </div>
         );
 
@@ -109,7 +235,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
         return (
           <div>
             {widget.label && (
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 {widget.label}
                 {widget.required && <span className="text-red-500 ml-1">*</span>}
               </label>
@@ -128,7 +254,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
         return (
           <div>
             {widget.label && (
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 {widget.label}
                 {widget.required && <span className="text-red-500 ml-1">*</span>}
               </label>
@@ -139,6 +265,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
               rows={(widget as any).rows || 4}
               className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 resize-none"
             />
+            {widget.helpText && <p className="text-xs text-gray-500 mt-1">{widget.helpText}</p>}
           </div>
         );
 
@@ -147,7 +274,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
         return (
           <div>
             {widget.label && (
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 {widget.label}
                 {widget.required && <span className="text-red-500 ml-1">*</span>}
               </label>
@@ -155,6 +282,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
             <select disabled className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
               <option>{widget.placeholder || 'Select option...'}</option>
             </select>
+            {widget.helpText && <p className="text-xs text-gray-500 mt-1">{widget.helpText}</p>}
           </div>
         );
 
@@ -162,7 +290,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
         return (
           <div>
             {widget.label && (
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
                 {widget.label}
                 {widget.required && <span className="text-red-500 ml-1">*</span>}
               </label>
@@ -171,10 +299,11 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
               {[1, 2, 3].map((i) => (
                 <div key={i} className="flex items-center">
                   <input type="radio" disabled className="mr-2" />
-                  <span className="text-sm text-gray-600">Option {i}</span>
+                  <span className="text-sm text-gray-700">Option {i}</span>
                 </div>
               ))}
             </div>
+            {widget.helpText && <p className="text-xs text-gray-500 mt-2">{widget.helpText}</p>}
           </div>
         );
 
@@ -184,6 +313,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
             <input type="checkbox" disabled className="mr-2" />
             <label className="text-sm font-medium text-gray-700">
               {widget.label || 'Checkbox label'}
+              {widget.required && <span className="text-red-500 ml-1">*</span>}
             </label>
           </div>
         );
@@ -194,13 +324,15 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
             {widget.label && (
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {widget.label}
+                {widget.required && <span className="text-red-500 ml-1">*</span>}
               </label>
             )}
             <div className="flex gap-1">
               {Array.from({ length: (widget as any).maxRating || 5 }).map((_, i) => (
-                <span key={i} className="text-2xl text-gray-300">★</span>
+                <span key={i} className="text-2xl text-yellow-400">★</span>
               ))}
             </div>
+            {widget.helpText && <p className="text-xs text-gray-500 mt-1">{widget.helpText}</p>}
           </div>
         );
 
@@ -223,6 +355,7 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
               <span>{(widget as any).min || 0}</span>
               <span>{(widget as any).max || 100}</span>
             </div>
+            {widget.helpText && <p className="text-xs text-gray-500 mt-1">{widget.helpText}</p>}
           </div>
         );
 
@@ -230,8 +363,9 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
         return (
           <div>
             {widget.label && (
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 {widget.label}
+                {widget.required && <span className="text-red-500 ml-1">*</span>}
               </label>
             )}
             <input
@@ -239,27 +373,30 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
               disabled
               className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
             />
+            {widget.helpText && <p className="text-xs text-gray-500 mt-1">{widget.helpText}</p>}
           </div>
         );
 
       case 'INSTRUCTION_TEXT':
         return (
-          <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded">
-            <span className="text-blue-600">ℹ</span>
-            <p className="text-sm text-gray-700">{(widget as any).content || 'Instructions...'}</p>
+          <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <span className="text-blue-600 text-xl">ℹ️</span>
+            <div className="flex-1">
+              <p className="text-sm text-gray-700">{(widget as any).content || 'Instructions...'}</p>
+            </div>
           </div>
         );
 
       case 'DIVIDER':
-        return <hr className="border-gray-300" />;
+        return <div className="w-full h-px bg-gray-300"></div>;
 
       case 'SPACER':
-        return <div className="bg-gray-100 rounded" style={{ height: (widget as any).height || 20 }} />;
+        return <div style={{ height: `${(widget as any).height || 20}px` }} className="bg-gray-50"></div>;
 
       default:
         return (
-          <div className="text-sm text-gray-500 text-center py-4">
-            {widget.type} widget
+          <div className="text-sm text-gray-500 italic">
+            Unknown widget type: {widget.type}
           </div>
         );
     }
@@ -267,82 +404,87 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
 
   const sortedWidgets = [...configuration.widgets].sort((a, b) => a.order - b.order);
 
+  if (sortedWidgets.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center bg-white rounded-lg border-2 border-dashed border-gray-300" onClick={handleCanvasClick}>
+        <div className="text-center">
+          <div className="text-6xl mb-4">🎨</div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Empty Canvas</h3>
+          <p className="text-sm text-gray-500 max-w-sm">
+            Add widgets from the left panel to start building your annotation interface.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div
-      ref={canvasRef}
-      className="relative w-full h-full bg-white rounded-lg border-2 border-dashed border-gray-300 overflow-auto"
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onClick={handleCanvasClick}
-      style={{ minHeight: '800px' }}
-    >
-      {/* Grid Background */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage: `
-            linear-gradient(to right, #f0f0f0 1px, transparent 1px),
-            linear-gradient(to bottom, #f0f0f0 1px, transparent 1px)
-          `,
-          backgroundSize: '20px 20px',
-        }}
-      />
+    <div className="h-full overflow-auto bg-gray-50 p-8" onClick={handleCanvasClick}>
+      <div style={getContainerStyle()}>
+        {sortedWidgets.map((widget, index) => (
+          <div
+            key={widget.id}
+            style={getWidgetStyle(widget)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectWidget(widget.id);
+            }}
+            onMouseEnter={() => setHoveredWidget(widget.id)}
+            onMouseLeave={() => setHoveredWidget(null)}
+            className="group"
+          >
+            {/* Widget Controls */}
+            {(selectedWidget?.id === widget.id || hoveredWidget === widget.id) && (
+              <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                {index > 0 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMoveUp(widget);
+                    }}
+                    className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                    title="Move up"
+                  >
+                    <MoveUp size={14} />
+                  </button>
+                )}
+                {index < sortedWidgets.length - 1 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMoveDown(widget);
+                    }}
+                    className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                    title="Move down"
+                  >
+                    <MoveDown size={14} />
+                  </button>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteWidget(widget.id);
+                  }}
+                  className="p-1.5 bg-white border border-red-300 rounded hover:bg-red-50 text-red-600"
+                  title="Delete"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            )}
 
-      {/* Widgets */}
-      {sortedWidgets.map((widget) => (
-        <div
-          key={widget.id}
-          style={getWidgetStyle(widget)}
-          onMouseDown={(e) => handleMouseDown(e, widget)}
-        >
-          {/* Widget Controls */}
-          {selectedWidget?.id === widget.id && (
-            <div className="absolute -top-8 right-0 flex gap-1 bg-white border border-gray-200 rounded-md shadow-sm p-1">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Copy functionality
-                }}
-                className="p-1 hover:bg-gray-100 rounded"
-                title="Copy"
-              >
-                <Copy size={14} className="text-gray-600" />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeleteWidget(widget.id);
-                }}
-                className="p-1 hover:bg-red-50 rounded"
-                title="Delete"
-              >
-                <Trash2 size={14} className="text-red-600" />
-              </button>
-            </div>
-          )}
+            {/* Widget Badge */}
+            {selectedWidget?.id === widget.id && (
+              <div className="absolute -top-3 left-3 px-2 py-0.5 bg-blue-600 text-white text-xs font-medium rounded-full">
+                {widget.type.replace('_', ' ')}
+              </div>
+            )}
 
-          {/* Widget Content */}
-          <div className="pointer-events-none">
+            {/* Widget Content */}
             {renderWidgetPreview(widget)}
           </div>
-
-          {/* Widget Label Badge */}
-          <div className="absolute -top-5 left-0 px-2 py-0.5 bg-blue-600 text-white text-xs rounded-t">
-            {widget.type}
-          </div>
-        </div>
-      ))}
-
-      {/* Empty State */}
-      {sortedWidgets.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center text-gray-400">
-            <Move size={48} className="mx-auto mb-4 opacity-50" />
-            <p className="text-lg font-medium">No widgets yet</p>
-            <p className="text-sm mt-2">Click a widget from the left panel to add it to the canvas</p>
-          </div>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 };

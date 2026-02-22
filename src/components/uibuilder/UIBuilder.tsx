@@ -30,11 +30,26 @@ function buildDefaultConfig(projectId: string): UIConfiguration {
     pipelineMode: 'ANNOTATION',
     fileType: 'TEXT',
     layout: {
-      type: 'two-column',
-      columns: 2,
+      type: 'flex-vertical',
+      columns: 1,
       gap: 16,
+      maxWidth: 800,
     },
     widgets: [],
+  };
+}
+
+// Normalize widget orders to ensure sequential unique values
+function normalizeWidgetOrders(config: UIConfiguration): UIConfiguration {
+  const sortedWidgets = [...config.widgets].sort((a, b) => a.order - b.order);
+  const normalizedWidgets = sortedWidgets.map((widget, index) => ({
+    ...widget,
+    order: index,
+  }));
+  
+  return {
+    ...config,
+    widgets: normalizedWidgets,
   };
 }
 
@@ -42,14 +57,24 @@ function buildDefaultConfig(projectId: string): UIConfiguration {
 function uiBuilderReducer(state: UIBuilderState, action: UIBuilderAction): UIBuilderState {
   switch (action.type) {
     case 'ADD_WIDGET': {
+      // Calculate next order value based on existing widgets
+      const maxOrder = state.configuration.widgets.length > 0
+        ? Math.max(...state.configuration.widgets.map(w => w.order))
+        : -1;
+      
+      const widgetWithOrder = {
+        ...action.widget,
+        order: maxOrder + 1,
+      };
+      
       const newConfig = {
         ...state.configuration,
-        widgets: [...state.configuration.widgets, action.widget],
+        widgets: [...state.configuration.widgets, widgetWithOrder],
       } as UIConfiguration;
       return {
         ...state,
         configuration: newConfig,
-        selectedWidget: action.widget,
+        selectedWidget: widgetWithOrder,
         isDirty: true,
         history: [...state.history.slice(0, state.historyIndex + 1), newConfig],
         historyIndex: state.historyIndex + 1,
@@ -163,10 +188,11 @@ function uiBuilderReducer(state: UIBuilderState, action: UIBuilderAction): UIBui
     }
 
     case 'LOAD_CONFIGURATION': {
+      const normalizedConfig = normalizeWidgetOrders(action.configuration);
       return {
         ...state,
-        configuration: action.configuration,
-        history: [action.configuration],
+        configuration: normalizedConfig,
+        history: [normalizedConfig],
         historyIndex: 0,
         isDirty: false,
         selectedWidget: null,
@@ -194,10 +220,11 @@ function uiBuilderReducer(state: UIBuilderState, action: UIBuilderAction): UIBui
         projectId: state.configuration.projectId,
         version: 1,
       };
+      const normalizedConfig = normalizeWidgetOrders(templateConfig);
       return {
         ...state,
-        configuration: templateConfig,
-        history: [templateConfig],
+        configuration: normalizedConfig,
+        history: [normalizedConfig],
         historyIndex: 0,
         isDirty: true,
         selectedWidget: null,
@@ -222,14 +249,18 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const defaultConfig = buildDefaultConfig(projectId);
+  
+  // Normalize initial configuration to ensure widget orders are sequential
+  const normalizedInitialConfig = initialConfiguration 
+    ? normalizeWidgetOrders(initialConfiguration)
+    : defaultConfig;
 
   const initialState: UIBuilderState = {
-    configuration: initialConfiguration || defaultConfig,
+    configuration: normalizedInitialConfig,
     selectedWidget: null,
     draggedWidget: null,
     clipboard: null,
-    // Fix: initialize history with the same value as configuration
-    history: [initialConfiguration || defaultConfig],
+    history: [normalizedInitialConfig],
     historyIndex: 0,
     isDirty: false,
     previewMode: 'ANNOTATION',
@@ -348,6 +379,30 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
             <option value="VIDEO">Video</option>
             <option value="CSV">CSV</option>
             <option value="PDF">PDF</option>
+          </select>
+
+          {/* Layout type */}
+          <select
+            value={state.configuration.layout.type}
+            onChange={(e) =>
+              dispatch({ 
+                type: 'UPDATE_CONFIG_METADATA', 
+                updates: { 
+                  layout: { 
+                    ...state.configuration.layout, 
+                    type: e.target.value as any 
+                  } 
+                } 
+              })
+            }
+            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+            title="Layout Type"
+          >
+            <option value="flex-vertical">Vertical (Stacked)</option>
+            <option value="flex-horizontal">Horizontal (Wrapped)</option>
+            <option value="grid">Grid</option>
+            <option value="two-column">Two Columns</option>
+            <option value="three-column">Three Columns</option>
           </select>
 
           {/* Preview mode */}

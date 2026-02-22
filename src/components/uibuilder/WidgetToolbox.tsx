@@ -20,6 +20,7 @@ import {
   Box,
   Type,
   List,
+  HelpCircle,
 } from 'lucide-react';
 import { Widget, WidgetDefinition } from '../../types/uiBuilder';
 
@@ -35,8 +36,25 @@ const widgetDefinitions: WidgetDefinition[] = [
     icon: 'FileText',
     category: 'media',
     defaultConfig: {
+      size: { width: 800, height: 600 },
+      position: { x: 0, y: 0 },
+      sizePreset: 'full-width',
+    },
+    configSchema: {},
+  },
+  {
+    type: 'QUESTION',
+    name: 'Question Widget',
+    description: 'Dynamically renders questions from project configuration',
+    icon: 'HelpCircle',
+    category: 'input',
+    defaultConfig: {
       size: { width: 600, height: 400 },
       position: { x: 0, y: 0 },
+      sizePreset: 'large',
+      renderMode: 'paginated',
+      showProgress: true,
+      showNavigation: true,
     },
     configSchema: {},
   },
@@ -49,6 +67,7 @@ const widgetDefinitions: WidgetDefinition[] = [
     defaultConfig: {
       size: { width: 400, height: 40 },
       position: { x: 0, y: 0 },
+      sizePreset: 'medium',
     },
     configSchema: {},
   },
@@ -61,6 +80,7 @@ const widgetDefinitions: WidgetDefinition[] = [
     defaultConfig: {
       size: { width: 400, height: 120 },
       position: { x: 0, y: 0 },
+      sizePreset: 'medium',
       rows: 4,
     },
     configSchema: {},
@@ -74,6 +94,7 @@ const widgetDefinitions: WidgetDefinition[] = [
     defaultConfig: {
       size: { width: 300, height: 40 },
       position: { x: 0, y: 0 },
+      sizePreset: 'medium',
       options: [],
     },
     configSchema: {},
@@ -87,6 +108,7 @@ const widgetDefinitions: WidgetDefinition[] = [
     defaultConfig: {
       size: { width: 300, height: 40 },
       position: { x: 0, y: 0 },
+      sizePreset: 'medium',
       options: [],
     },
     configSchema: {},
@@ -100,6 +122,7 @@ const widgetDefinitions: WidgetDefinition[] = [
     defaultConfig: {
       size: { width: 300, height: 120 },
       position: { x: 0, y: 0 },
+      sizePreset: 'medium',
       options: [],
       layout: 'vertical',
     },
@@ -114,6 +137,7 @@ const widgetDefinitions: WidgetDefinition[] = [
     defaultConfig: {
       size: { width: 300, height: 40 },
       position: { x: 0, y: 0 },
+      sizePreset: 'small',
     },
     configSchema: {},
   },
@@ -126,6 +150,7 @@ const widgetDefinitions: WidgetDefinition[] = [
     defaultConfig: {
       size: { width: 200, height: 40 },
       position: { x: 0, y: 0 },
+      sizePreset: 'small',
       maxRating: 5,
       icon: 'star',
     },
@@ -140,6 +165,7 @@ const widgetDefinitions: WidgetDefinition[] = [
     defaultConfig: {
       size: { width: 300, height: 60 },
       position: { x: 0, y: 0 },
+      sizePreset: 'medium',
       min: 0,
       max: 100,
       step: 1,
@@ -155,6 +181,7 @@ const widgetDefinitions: WidgetDefinition[] = [
     defaultConfig: {
       size: { width: 300, height: 40 },
       position: { x: 0, y: 0 },
+      sizePreset: 'medium',
     },
     configSchema: {},
   },
@@ -167,6 +194,7 @@ const widgetDefinitions: WidgetDefinition[] = [
     defaultConfig: {
       size: { width: 600, height: 60 },
       position: { x: 0, y: 0 },
+      sizePreset: 'full-width',
       content: 'Enter instructions here...',
     },
     configSchema: {},
@@ -227,6 +255,7 @@ const iconComponents: Record<string, any> = {
   Box,
   Type,
   List,
+  HelpCircle,
 };
 
 export const WidgetToolbox: React.FC<WidgetToolboxProps> = ({ onAddWidget }) => {

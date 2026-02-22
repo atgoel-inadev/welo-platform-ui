@@ -43,6 +43,11 @@ export const FileViewer = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detectedFileType, setDetectedFileType] = useState<FileType>(fileData.type);
+  
+  // Check if file is SVG (needs special handling)
+  const isSVG = fileData.name.toLowerCase().endsWith('.svg') || 
+                fileData.mimeType === 'image/svg+xml' ||
+                fileData.url.toLowerCase().includes('.svg');
 
   useEffect(() => {
     const detectedFileType = getFileType(fileData.name, fileData.mimeType);
@@ -72,6 +77,12 @@ export const FileViewer = ({
       try {
         if (!containerRef.current) return;
 
+        // SVG, PDF, HTML handled via native browser rendering (see render section below)
+        if (isSVG || detectedFileType === FileType.PDF || detectedFileType === FileType.HTML) {
+          setIsLoading(false);
+          return;
+        }
+
         let renderer: BaseRenderer | null = null;
 
         switch (detectedFileType) {
@@ -93,7 +104,7 @@ export const FileViewer = ({
             renderer = new VideoRenderer(containerRef.current, config);
             break;
           default:
-            throw new Error(`Unsupported file type: ${fileType}`);
+            throw new Error(`Unsupported file type: ${detectedFileType}`);
         }
 
         if (renderer) {
@@ -200,6 +211,31 @@ export const FileViewer = ({
               </div>
             </div>
           </div>
+        )}
+
+        {/* Render SVG files using img tag for proper rendering */}
+        {!isLoading && !error && isSVG && (
+          <div className="flex items-center justify-center w-full h-full p-4">
+            <img
+              src={fileData.url}
+              alt={fileData.name}
+              className="max-w-full max-h-full object-contain"
+              onError={(e) => {
+                console.error('SVG load error:', e);
+                setError('Failed to load SVG file');
+              }}
+            />
+          </div>
+        )}
+
+        {/* Render PDF and HTML files using iframe */}
+        {!isLoading && !error && !isSVG && (detectedFileType === FileType.PDF || detectedFileType === FileType.HTML) && (
+          <iframe
+            src={fileData.url}
+            title={fileData.name}
+            className="w-full h-full border-0"
+            sandbox="allow-same-origin allow-scripts"
+          />
         )}
       </div>
     </div>

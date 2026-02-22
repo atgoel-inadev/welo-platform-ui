@@ -228,6 +228,7 @@ export class TaskService {
    */
   async getMyTasks(userId: string, status?: 'ASSIGNED' | 'IN_PROGRESS'): Promise<Assignment[]> {
     const queryParams = new URLSearchParams();
+    queryParams.append('assignedTo', userId);
     if (status) queryParams.append('status', status);
 
     const url = `/tasks?${queryParams.toString()}`;

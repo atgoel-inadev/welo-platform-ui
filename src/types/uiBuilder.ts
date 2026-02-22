@@ -20,7 +20,7 @@ export type ResponseType =
 
 export type WidgetType =
   | 'FILE_VIEWER'
-  | 'QUESTION'
+  | 'QUESTION' // Generic question widget that renders from project config
   | 'TEXT_INPUT'
   | 'SELECT'
   | 'MULTI_SELECT'
@@ -34,6 +34,8 @@ export type WidgetType =
   | 'DIVIDER'
   | 'SPACER'
   | 'CONTAINER';
+
+export type WidgetSize = 'small' | 'medium' | 'large' | 'full-width' | 'custom';
 
 export type PipelineMode = 'ANNOTATION' | 'REVIEW' | 'QUALITY_CHECK';
 
@@ -91,13 +93,19 @@ export interface BaseWidget {
   required?: boolean;
   disabled?: boolean;
   hidden?: boolean;
-  position: Position;
-  size: Size;
+  position: Position; // Still used for absolute positioning if needed
+  size: Size; // Actual pixel dimensions
+  sizePreset?: WidgetSize; // Preset size for responsive layouts
   style?: WidgetStyle;
   validation?: ValidationRule[];
   conditionalDisplay?: ConditionalDisplay[];
   pipelineModes?: PipelineMode[]; // Which pipeline modes this widget appears in
-  order: number; // Display order
+  order: number; // Display order (important for flex layouts)
+  layoutProps?: {
+    column?: number; // Which column in grid (1-based)
+    row?: number; // Which row in grid (1-based)
+    span?: number; // How many columns to span
+  };
 }
 
 export interface FileViewerWidget extends BaseWidget {
@@ -194,6 +202,14 @@ export interface SpacerWidget extends BaseWidget {
   height?: number;
 }
 
+export interface QuestionWidget extends BaseWidget {
+  type: 'QUESTION';
+  questionId?: string; // If linked to specific project question
+  renderMode: 'all' | 'paginated'; // Show all questions or one at a time
+  showProgress?: boolean; // Show question progress (e.g., "Question 2 of 5")
+  showNavigation?: boolean; // Show Next/Previous buttons
+}
+
 export interface ContainerWidget extends BaseWidget {
   type: 'CONTAINER';
   children: Widget[];
@@ -206,6 +222,7 @@ export interface ContainerWidget extends BaseWidget {
 
 export type Widget =
   | FileViewerWidget
+  | QuestionWidget
   | TextInputWidget
   | TextAreaWidget
   | SelectWidget
@@ -229,9 +246,10 @@ export interface UIConfiguration {
   pipelineMode: PipelineMode;
   fileType: FileType;
   layout: {
-    type: 'single-column' | 'two-column' | 'three-column' | 'custom';
-    columns?: number;
-    gap?: number;
+    type: 'grid' | 'flex-vertical' | 'flex-horizontal' | 'two-column' | 'three-column' | 'custom';
+    columns?: number; // For grid layout
+    gap?: number; // Gap between items in pixels
+    maxWidth?: number; // Max width of the canvas
   };
   widgets: Widget[];
   theme?: {

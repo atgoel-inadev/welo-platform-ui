@@ -1,5 +1,4 @@
 import { useParams, Navigate } from 'react-router-dom';
-import { Layout } from '../../components/Layout';
 import UnifiedTaskRenderer from '../../components/task/UnifiedTaskRenderer';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -19,34 +18,28 @@ export const AnnotateTask = () => {
 
   if (!taskId) {
     return (
-      <Layout>
-        <div className="p-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-700">Task ID is missing</p>
-          </div>
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-700">Task ID is missing</p>
         </div>
-      </Layout>
+      </div>
     );
   }
 
   if (!user?.id) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      </Layout>
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <UnifiedTaskRenderer
-        taskId={taskId}
-        viewType="annotator"
-        userId={user.id}
-      />
-    </Layout>
+    <UnifiedTaskRenderer
+      taskId={taskId}
+      viewType="annotator"
+      userId={user.id}
+    />
   );
 };
 
