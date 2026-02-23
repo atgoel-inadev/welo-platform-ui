@@ -29,6 +29,7 @@ function buildDefaultConfig(projectId: string): UIConfiguration {
     projectId,
     pipelineMode: 'ANNOTATION',
     fileType: 'TEXT',
+    responseType: 'STRUCTURED',
     layout: {
       type: 'flex-vertical',
       columns: 1,

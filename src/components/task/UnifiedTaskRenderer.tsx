@@ -17,6 +17,16 @@ import {
   AnnotationQaRecord,
   QcCheckResult,
 } from '../../services/annotationQaService';
+import { pluginService, Plugin, PluginResult, PluginFailBehavior } from '../../services/pluginService';
+
+// ─── Plugin state per question ────────────────────────────────────────────────
+interface QuestionPluginState {
+  status: 'idle' | 'running' | PluginResult;
+  message?: string;
+  behavior?: PluginFailBehavior;
+  overrideReason?: string;
+  acknowledged?: boolean;
+}
 
 interface UnifiedTaskRendererProps {
   taskId: string;
@@ -382,6 +392,9 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
   // Timer
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
+  // Plugin validation state per question
+  const [questionPluginState, setQuestionPluginState] = useState<Record<string, QuestionPluginState>>({});
+
   useEffect(() => {
     loadTaskConfig();
   }, [taskId, userId]);
@@ -452,6 +465,81 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
     });
   }, []);
 
+  // Run all active plugins for a question (called on blur / navigate away)
+  const runPluginsForQuestion = useCallback(async (questionId: string) => {
+    if (!config) return;
+    const answer = formData[questionId];
+    const isEmpty = answer === undefined || answer === null || answer === '' || (Array.isArray(answer) && answer.length === 0);
+    if (isEmpty) return;
+
+    const plugins: Plugin[] = (config as any).plugins ?? [];
+    const activePlugins = plugins.filter(
+      (p) => p.enabled && !p.isDraft && p.trigger === 'ON_BLUR' &&
+        (p.questionBindings.length === 0 || p.questionBindings.includes(questionId)),
+    );
+    if (activePlugins.length === 0) return;
+
+    setQuestionPluginState((prev) => ({
+      ...prev,
+      [questionId]: { status: 'running' },
+    }));
+
+    for (const plugin of activePlugins) {
+      const question = questions.find((q) => q.id === questionId);
+      try {
+        const result = await pluginService.executePlugin(config.taskId, {
+          pluginId: plugin.id,
+          projectId: config.projectId,
+          questionId,
+          questionText: question?.text ?? '',
+          questionType: question?.type ?? 'text',
+          answerValue: answer,
+        });
+
+        setQuestionPluginState((prev) => ({
+          ...prev,
+          [questionId]: {
+            status: result.result,
+            message: result.message,
+            behavior: result.onFailBehavior as PluginFailBehavior,
+          },
+        }));
+
+        // HARD_BLOCK: clear the answer to force re-entry
+        if (result.result === 'FAIL' && result.onFailBehavior === 'HARD_BLOCK') {
+          setFormData((prev) => {
+            const next = { ...prev };
+            delete next[questionId];
+            return next;
+          });
+          setAnsweredQuestions((prev) => {
+            const next = new Set(prev);
+            next.delete(questionId);
+            return next;
+          });
+          break;
+        }
+      } catch {
+        setQuestionPluginState((prev) => ({
+          ...prev,
+          [questionId]: { status: 'ERROR', message: 'Validation service unavailable' },
+        }));
+      }
+    }
+
+    // Auto-dismiss PASS after 2s
+    setTimeout(() => {
+      setQuestionPluginState((prev) => {
+        if (prev[questionId]?.status === 'PASS') {
+          const next = { ...prev };
+          delete next[questionId];
+          return next;
+        }
+        return prev;
+      });
+    }, 2000);
+  }, [config, formData, questions]);
+
   const currentQuestion = questions[currentQuestionIdx];
   const isFirst = currentQuestionIdx === 0;
   const isLast = currentQuestionIdx === questions.length - 1;
@@ -459,8 +547,14 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
   const isCurrentAnswered = currentQuestion ? answeredQuestions.has(currentQuestion.id) : false;
   const canProceed = !currentQuestion?.required || isCurrentAnswered;
 
-  const handleNext = () => { if (!isLast) setCurrentQuestionIdx((i) => i + 1); };
-  const handlePrev = () => { if (!isFirst) setCurrentQuestionIdx((i) => i - 1); };
+  const handleNext = () => {
+    if (currentQuestion) runPluginsForQuestion(currentQuestion.id);
+    if (!isLast) setCurrentQuestionIdx((i) => i + 1);
+  };
+  const handlePrev = () => {
+    if (currentQuestion) runPluginsForQuestion(currentQuestion.id);
+    if (!isFirst) setCurrentQuestionIdx((i) => i - 1);
+  };
 
   const validateAnnotationForm = (): boolean => {
     const required = questions.filter((q) => q.required !== false);
@@ -479,6 +573,32 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
 
   const handleSubmitAnnotation = async () => {
     if (!validateAnnotationForm()) return;
+
+    // Plugin submit guard
+    for (const [questionId, ps] of Object.entries(questionPluginState)) {
+      if (ps.status === 'running') {
+        alert('A validation is still running. Please wait.');
+        return;
+      }
+      if (ps.status === 'FAIL' && ps.behavior === 'HARD_BLOCK') {
+        const idx = questions.findIndex((q) => q.id === questionId);
+        if (idx !== -1) setCurrentQuestionIdx(idx);
+        alert('Please correct the answer flagged as invalid before submitting.');
+        return;
+      }
+      if (ps.status === 'WARN' && !ps.acknowledged) {
+        const idx = questions.findIndex((q) => q.id === questionId);
+        if (idx !== -1) setCurrentQuestionIdx(idx);
+        alert('Please acknowledge all warnings before submitting.');
+        return;
+      }
+      if (ps.status === 'FAIL' && ps.behavior === 'SOFT_WARN' && !ps.overrideReason?.trim()) {
+        const idx = questions.findIndex((q) => q.id === questionId);
+        if (idx !== -1) setCurrentQuestionIdx(idx);
+        alert('Please provide an override reason for all failed validations before submitting.');
+        return;
+      }
+    }
     try {
       setSubmitting(true);
 
@@ -758,22 +878,34 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
                   </div>
                   {/* Clickable question dots */}
                   <div className="flex gap-1.5 mt-2 flex-wrap">
-                    {questions.map((q, i) => (
-                      <button
-                        key={q.id}
-                        onClick={() => setCurrentQuestionIdx(i)}
-                        className={`w-6 h-6 rounded-full text-xs font-semibold transition-all ${
-                          i === currentQuestionIdx
-                            ? 'bg-blue-600 text-white scale-110 shadow-sm'
-                            : answeredQuestions.has(q.id)
-                            ? 'bg-green-500 text-white'
-                            : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
-                        }`}
-                        title={`Q${i + 1}: ${q.text}`}
-                      >
-                        {i + 1}
-                      </button>
-                    ))}
+                    {questions.map((q, i) => {
+                      const ps = questionPluginState[q.id];
+                      const hasFail = ps?.status === 'FAIL';
+                      const hasWarn = ps?.status === 'WARN' && !ps.acknowledged;
+                      return (
+                        <button
+                          key={q.id}
+                          onClick={() => {
+                            if (currentQuestion) runPluginsForQuestion(currentQuestion.id);
+                            setCurrentQuestionIdx(i);
+                          }}
+                          className={`w-6 h-6 rounded-full text-xs font-semibold transition-all ${
+                            i === currentQuestionIdx
+                              ? 'bg-blue-600 text-white scale-110 shadow-sm'
+                              : hasFail
+                              ? 'bg-red-500 text-white'
+                              : hasWarn
+                              ? 'bg-amber-400 text-white'
+                              : answeredQuestions.has(q.id)
+                              ? 'bg-green-500 text-white'
+                              : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+                          }`}
+                          title={`Q${i + 1}: ${q.text}`}
+                        >
+                          {i + 1}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -813,7 +945,102 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
                           question={currentQuestion}
                           value={currentValue}
                           onChange={(v) => handleQuestionResponse(currentQuestion.id, v)}
+                          disabled={questionPluginState[currentQuestion.id]?.status === 'running'}
                         />
+
+                        {/* ── Inline plugin feedback ── */}
+                        {(() => {
+                          const ps = questionPluginState[currentQuestion.id];
+                          if (!ps || ps.status === 'idle') return null;
+
+                          if (ps.status === 'running') {
+                            return (
+                              <div className="mt-2 flex items-center gap-2 text-xs text-blue-600">
+                                <Loader2 size={12} className="animate-spin" />
+                                Validating...
+                              </div>
+                            );
+                          }
+                          if (ps.status === 'PASS') {
+                            return (
+                              <div className="mt-2 flex items-center gap-1 text-xs text-green-600">
+                                <CheckCircle size={12} /> Validation passed
+                              </div>
+                            );
+                          }
+                          if (ps.status === 'WARN') {
+                            return (
+                              <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+                                <div className="flex items-center gap-1 font-semibold mb-1">
+                                  <AlertTriangle size={12} /> Warning
+                                </div>
+                                <p>{ps.message}</p>
+                                {!ps.acknowledged && (
+                                  <button
+                                    onClick={() => setQuestionPluginState((prev) => ({
+                                      ...prev,
+                                      [currentQuestion.id]: { ...prev[currentQuestion.id], acknowledged: true },
+                                    }))}
+                                    className="mt-2 px-3 py-1 bg-amber-600 text-white rounded-md text-xs font-medium hover:bg-amber-700"
+                                  >
+                                    Acknowledge
+                                  </button>
+                                )}
+                                {ps.acknowledged && (
+                                  <span className="mt-1 inline-flex items-center gap-1 text-amber-700"><CheckCircle size={10} /> Acknowledged</span>
+                                )}
+                              </div>
+                            );
+                          }
+                          if (ps.status === 'FAIL') {
+                            if (ps.behavior === 'HARD_BLOCK') {
+                              return (
+                                <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800">
+                                  <div className="flex items-center gap-1 font-semibold mb-1">
+                                    <XCircle size={12} /> Validation Failed — Answer Cleared
+                                  </div>
+                                  <p>{ps.message || 'Please correct your answer.'}</p>
+                                </div>
+                              );
+                            }
+                            if (ps.behavior === 'SOFT_WARN') {
+                              return (
+                                <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800 space-y-2">
+                                  <div className="flex items-center gap-1 font-semibold">
+                                    <XCircle size={12} /> Failed
+                                  </div>
+                                  <p>{ps.message}</p>
+                                  <div>
+                                    <label className="block font-medium mb-1">Override reason (required to submit):</label>
+                                    <textarea
+                                      rows={2}
+                                      value={ps.overrideReason ?? ''}
+                                      onChange={(e) => setQuestionPluginState((prev) => ({
+                                        ...prev,
+                                        [currentQuestion.id]: { ...prev[currentQuestion.id], overrideReason: e.target.value },
+                                      }))}
+                                      className="w-full border border-red-300 rounded-md px-2 py-1 text-xs text-gray-800 focus:ring-1 focus:ring-red-400 resize-none"
+                                      placeholder="Explain why you are overriding this validation..."
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            }
+                            // ADVISORY
+                            return (
+                              <div className="mt-2 flex items-start gap-1 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg p-2">
+                                <AlertTriangle size={12} className="mt-0.5 flex-shrink-0" />
+                                <span>{ps.message || 'Validation advisory.'}</span>
+                              </div>
+                            );
+                          }
+                          // ERROR / TIMEOUT
+                          return (
+                            <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
+                              <AlertCircle size={12} /> {ps.message || 'Validation unavailable'}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}

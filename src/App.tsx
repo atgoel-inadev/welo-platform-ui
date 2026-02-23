@@ -24,6 +24,7 @@ import { BatchDetails } from './pages/ops/BatchDetails';
 import { UserManagement } from './pages/ops/UserManagement';
 import { DemoWorkflow } from './pages/ops/DemoWorkflow';
 import { TimeAnalytics } from './pages/ops/TimeAnalytics';
+import { ProjectPlugins } from './pages/ops/ProjectPlugins';
 import { UserRole } from './services/authService';
 
 function App() {
@@ -72,6 +73,7 @@ function App() {
             <Route path="batches/:id" element={<BatchDetails />} />
             <Route path="projects/:projectId/batch-upload" element={<BatchUpload />} />
             <Route path="projects/:projectId/demo" element={<DemoWorkflow />} />
+            <Route path="projects/:projectId/plugins" element={<ProjectPlugins />} />
             <Route path="users" element={<UserManagement />} />
             <Route path="analytics/time" element={<TimeAnalytics />} />
           </Route>

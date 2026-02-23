@@ -61,11 +61,25 @@ export const UIBuilderPage = () => {
       setLoading(true);
       setError(null);
 
+      // Transform widgets to include legacy position/size fields for backend validation
+      const transformedConfiguration = {
+        ...configuration,
+        // Ensure responseType is set (required by backend)
+        responseType: configuration.responseType || 'STRUCTURED',
+        widgets: configuration.widgets.map((widget: any, index: number) => ({
+          ...widget,
+          // Add legacy position field if missing (required by backend validation)
+          position: widget.position || { x: 0, y: index * 100 },
+          // Add legacy size field if missing (required by backend validation)
+          size: widget.size || { width: 400, height: 300 },
+        })),
+      };
+
       // Check if configuration already exists
       const configData = {
         name: configuration.name || `UI Configuration for Project ${projectId}`,
         description: configuration.description || 'Dynamic UI configuration',
-        configuration,
+        configuration: transformedConfiguration,
       };
 
       try {
@@ -84,6 +98,8 @@ export const UIBuilderPage = () => {
       navigate(`/ops/projects/${projectId}/edit`);
     } catch (error: any) {
       console.error('Failed to save UI configuration:', error);
+      console.error('Error details:', error.response?.data);
+      console.error('Configuration being saved:', configData);
       setError(error.response?.data?.message || 'Failed to save UI configuration');
     } finally {
       setLoading(false);

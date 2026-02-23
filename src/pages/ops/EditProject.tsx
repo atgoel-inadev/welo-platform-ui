@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Save, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, ArrowLeft, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks/useRedux';
 import { fetchProjectById, updateProject } from '../../store/projectsSlice';
 import { Button, FormInput, FormTextarea, FormSelect } from '../../components/common';
@@ -137,8 +137,19 @@ export const EditProject = () => {
           <Button onClick={() => navigate('/ops/projects')} variant="ghost" icon={ArrowLeft} className="mb-4">
             Back to Projects
           </Button>
-          <h1 className="text-3xl font-bold text-gray-900">Edit Project</h1>
-          <p className="text-gray-600 mt-2">Update project settings</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Edit Project</h1>
+              <p className="text-gray-600 mt-2">Update project settings</p>
+            </div>
+            <Button
+              onClick={() => navigate(`/ops/projects/${id}/plugins`)}
+              variant="secondary"
+              icon={Zap}
+            >
+              Manage Plugins
+            </Button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-8">

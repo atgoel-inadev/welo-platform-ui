@@ -245,6 +245,7 @@ export interface UIConfiguration {
   projectId: string;
   pipelineMode: PipelineMode;
   fileType: FileType;
+  responseType?: 'TEXT' | 'SINGLE_SELECT' | 'MULTI_SELECT' | 'RATING' | 'BOOLEAN' | 'NUMBER' | 'DATE' | 'STRUCTURED';
   layout: {
     type: 'grid' | 'flex-vertical' | 'flex-horizontal' | 'two-column' | 'three-column' | 'custom';
     columns?: number; // For grid layout
