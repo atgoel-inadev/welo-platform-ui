@@ -194,7 +194,10 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
         );
 
       case 'SELECT':
-      case 'MULTI_SELECT':
+      case 'MULTI_SELECT': {
+        const selOpts: { id: string; label: string }[] = ((widget as any).options || []).map((o: any) =>
+          typeof o === 'string' ? { id: o, label: o } : o,
+        );
         return (
           <div>
             {widget.label && (
@@ -206,10 +209,29 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
               <span>{widget.placeholder || 'Select…'}</span>
               <ChevronDown size={12} className="text-slate-400" />
             </div>
+            {selOpts.length > 0 && (
+              <div className="mt-1.5 space-y-1">
+                {selOpts.map((o) => (
+                  <div key={o.id} className="flex items-center gap-2 px-2 py-1 rounded text-xs text-slate-500">
+                    {widget.type === 'MULTI_SELECT'
+                      ? <span className="w-3 h-3 rounded border border-slate-300 flex-shrink-0" />
+                      : <span className="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0" />}
+                    <span>{o.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
+      }
 
-      case 'RADIO_GROUP':
+      case 'RADIO_GROUP': {
+        const radioOpts: { id: string; label: string }[] = ((widget as any).options || []).map((o: any) =>
+          typeof o === 'string' ? { id: o, label: o } : o,
+        );
+        const displayOpts = radioOpts.length > 0
+          ? radioOpts
+          : [{ id: '1', label: 'Option 1' }, { id: '2', label: 'Option 2' }, { id: '3', label: 'Option 3' }];
         return (
           <div>
             {widget.label && (
@@ -218,15 +240,16 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
               </label>
             )}
             <div className="space-y-1.5">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-2">
+              {displayOpts.map((o) => (
+                <div key={o.id} className="flex items-center gap-2">
                   <span className="w-3.5 h-3.5 rounded-full border-2 border-slate-300" />
-                  <span className="text-xs text-slate-600">Option {i}</span>
+                  <span className="text-xs text-slate-600">{o.label}</span>
                 </div>
               ))}
             </div>
           </div>
         );
+      }
 
       case 'CHECKBOX':
         return (

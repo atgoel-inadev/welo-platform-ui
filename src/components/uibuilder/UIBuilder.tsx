@@ -7,7 +7,7 @@ import { useState, useReducer, useCallback } from 'react';
 import {
   Save, Eye, Undo, Redo, Code, Download, Upload,
   LayoutTemplate, ArrowLeft, Check, AlertTriangle,
-  PanelRightClose,
+  PanelRightClose, List, SplitSquareVertical,
   Columns2, Columns3, LayoutGrid, AlignVerticalSpaceAround, AlignHorizontalSpaceAround,
 } from 'lucide-react';
 import { UIConfiguration, UIBuilderState, UIBuilderAction, PipelineMode, Widget, UITemplate } from '../../types/uiBuilder';
@@ -43,6 +43,7 @@ function buildDefaultConfig(projectId: string, fileType?: string): UIConfigurati
       maxWidth: 800,
     },
     widgets: [],
+    renderMode: 'paginated',
   };
 }
 
@@ -256,11 +257,28 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
 
   const defaultConfig = buildDefaultConfig(projectId, projectFileType);
 
-  // If we got an initial config, apply projectFileType override
+  // If we got an initial config, merge with defaults and apply projectFileType override
   const normalizedInitialConfig = initialConfiguration
     ? normalizeWidgetOrders({
+        ...defaultConfig,
         ...initialConfiguration,
-        fileType: (projectFileType as any) || initialConfiguration.fileType,
+        fileType: (projectFileType as any) || initialConfiguration.fileType || defaultConfig.fileType,
+        layout: initialConfiguration.layout && typeof initialConfiguration.layout === 'object'
+          ? initialConfiguration.layout
+          : defaultConfig.layout,
+        widgets: (initialConfiguration.widgets || []).map((w: any, i: number) => ({
+          ...w,
+          order: w.order ?? i,
+          required: w.required ?? false,
+          hidden: w.hidden ?? false,
+          sizePreset: w.sizePreset || 'medium',
+          // Normalize string options to { id, label, value } objects
+          options: Array.isArray(w.options)
+            ? w.options.map((o: any) =>
+                typeof o === 'string' ? { id: o, label: o, value: o } : o,
+              )
+            : w.options,
+        })),
       })
     : defaultConfig;
 
@@ -429,6 +447,43 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
                   {lo.icon}
                 </button>
               ))}
+            </div>
+
+            {/* Render mode toggle: Paginated vs All */}
+            <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden ml-2">
+              <button
+                onClick={() =>
+                  dispatch({
+                    type: 'UPDATE_CONFIG_METADATA',
+                    updates: { renderMode: 'paginated' },
+                  })
+                }
+                className={`p-2 transition-colors ${
+                  (state.configuration.renderMode || 'paginated') === 'paginated'
+                    ? 'bg-indigo-50 text-indigo-600'
+                    : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+                }`}
+                title="Paginated (one question at a time)"
+              >
+                <SplitSquareVertical size={14} />
+              </button>
+              <div className="w-px h-5 bg-slate-200" />
+              <button
+                onClick={() =>
+                  dispatch({
+                    type: 'UPDATE_CONFIG_METADATA',
+                    updates: { renderMode: 'all' },
+                  })
+                }
+                className={`p-2 transition-colors ${
+                  state.configuration.renderMode === 'all'
+                    ? 'bg-indigo-50 text-indigo-600'
+                    : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+                }`}
+                title="All questions (scrollable)"
+              >
+                <List size={14} />
+              </button>
             </div>
           </div>
 

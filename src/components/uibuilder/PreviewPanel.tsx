@@ -299,6 +299,7 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({ configuration, pipel
   const isFirst = currentIdx === 0;
   const current = questionWidgets[currentIdx];
   const isCurrentAnswered = current ? answeredQuestions.has(current.id) : false;
+  const renderMode = configuration.renderMode || 'paginated';
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -344,7 +345,7 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({ configuration, pipel
             )}
 
             {/* Questions section — mimics the right panel */}
-            {questionWidgets.length > 0 && (
+            {questionWidgets.length > 0 && renderMode === 'paginated' && (
               <div className="flex flex-col flex-1">
                 {/* Progress bar + question dots — exact match */}
                 <div className="bg-white border-b border-gray-200 px-4 py-2.5 flex-shrink-0">
@@ -453,6 +454,74 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({ configuration, pipel
                       Next <ChevronRight size={14} />
                     </button>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* All-at-once mode */}
+            {questionWidgets.length > 0 && renderMode === 'all' && (
+              <div className="flex flex-col flex-1">
+                {/* Progress summary */}
+                <div className="bg-white border-b border-gray-200 px-4 py-2.5 flex-shrink-0">
+                  <div className="flex items-center justify-between text-xs text-gray-600 mb-1.5">
+                    <span className="font-medium">All Questions</span>
+                    <span>{answeredQuestions.size}/{total} answered</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-blue-500 h-2 rounded-full transition-all duration-300" style={{ width: `${total > 0 ? (answeredQuestions.size / total) * 100 : 0}%` }} />
+                  </div>
+                </div>
+
+                {/* Instructions */}
+                {instructionWidgets.length > 0 && (
+                  <div className="px-4 pt-3 flex-shrink-0">
+                    {instructionWidgets.map((iw) => (
+                      <div key={iw.id} className="mb-2">
+                        <MockWidget widget={iw} value={null} onChange={() => {}} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* All question cards */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {questionWidgets.map((q, i) => (
+                    <div key={q.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                      <div className="mb-4">
+                        <div className="flex items-start gap-2 mb-1">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex-shrink-0 mt-0.5">
+                            {i + 1}
+                          </span>
+                          <h3 className="text-sm font-semibold text-gray-900 leading-snug">
+                            {q.label || 'Question'}
+                            {q.required !== false && <span className="text-red-500 ml-1">*</span>}
+                          </h3>
+                        </div>
+                        {(q.helpText || q.placeholder) && (
+                          <p className="text-xs text-gray-500 mt-1 ml-8">
+                            {q.helpText || q.placeholder}
+                          </p>
+                        )}
+                      </div>
+                      <div className="ml-8">
+                        <MockWidget
+                          widget={q}
+                          value={formData[q.id]}
+                          onChange={(v) => handleChange(q.id, v)}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Submit footer */}
+                <div className="bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-end flex-shrink-0">
+                  <button
+                    onClick={() => alert('Preview: Annotation would be submitted here!')}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs font-semibold transition shadow-sm"
+                  >
+                    <Send size={12} /> Submit Annotation
+                  </button>
                 </div>
               </div>
             )}

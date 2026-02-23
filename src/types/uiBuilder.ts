@@ -253,6 +253,7 @@ export interface UIConfiguration {
     maxWidth?: number; // Max width of the canvas
   };
   widgets: Widget[];
+  renderMode?: 'paginated' | 'all'; // Show questions one-at-a-time or all at once
   theme?: {
     primaryColor?: string;
     backgroundColor?: string;
@@ -314,4 +315,4 @@ export type UIBuilderAction =
   | { type: 'LOAD_CONFIGURATION'; configuration: UIConfiguration }
   | { type: 'SAVE_CONFIGURATION' }
   | { type: 'LOAD_TEMPLATE'; template: UITemplate }
-  | { type: 'UPDATE_CONFIG_METADATA'; updates: Partial<Pick<UIConfiguration, 'name' | 'fileType' | 'pipelineMode' | 'layout'>> };
+  | { type: 'UPDATE_CONFIG_METADATA'; updates: Partial<Pick<UIConfiguration, 'name' | 'fileType' | 'pipelineMode' | 'layout' | 'renderMode'>> };
