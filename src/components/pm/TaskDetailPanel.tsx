@@ -290,7 +290,7 @@ export function TaskDetailPanel({ task, projectTeamMembers, onClose, onReassigne
               <span className="text-xs text-gray-500 font-mono">{task.externalId}</span>
             </div>
             <h2 className="text-lg font-bold text-gray-900 truncate max-w-sm">
-              {(task as any).fileName || task.dataPayload?.sourceData?.title || task.externalId}
+              {(task as any).fileName || (task.dataPayload?.sourceData as any)?.title || task.externalId}
             </h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 flex-shrink-0">
@@ -454,7 +454,7 @@ export function TaskDetailPanel({ task, projectTeamMembers, onClose, onReassigne
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium
                         ${a.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
                           a.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-700' :
-                          a.status === 'RELEASED' ? 'bg-orange-100 text-orange-700' :
+                          a.status === 'REASSIGNED' ? 'bg-orange-100 text-orange-700' :
                           'bg-gray-100 text-gray-600'}`}
                       >
                         {a.status}

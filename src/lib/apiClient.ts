@@ -135,6 +135,15 @@ class ApiClient {
     const response = await this.client.delete<T>(url, config);
     return response.data;
   }
+
+  /**
+   * Generic request — used by orval-generated clients via custom mutator.
+   * Routes any AxiosRequestConfig through this instance's auth interceptors.
+   */
+  public async request<T>(config: AxiosRequestConfig): Promise<T> {
+    const response = await this.client.request<T>(config);
+    return response.data;
+  }
 }
 
 // Service URLs from environment or defaults

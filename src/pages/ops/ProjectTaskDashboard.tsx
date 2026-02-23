@@ -260,7 +260,7 @@ function BatchSection({
 export const ProjectTaskDashboard = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { user: currentUser } = useAppSelector((state) => state.auth);
+  useAppSelector((state) => state.auth); // keep store subscription for future auth checks
 
   // Data
   const [project, setProject] = useState<any>(null);
