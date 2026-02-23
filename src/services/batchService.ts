@@ -29,6 +29,24 @@ export interface AllocateFilesDto {
   dueDate?: string;
 }
 
+/**
+ * Directory Scan DTO (for DEMO mode)
+ */
+export interface ScanDirectoryDto {
+  directoryPath?: string; // Optional: defaults to {projectId}/{batchName}
+  filePattern?: string; // e.g., "*.jpg", "*.mp4"
+  taskType?: string;
+  autoAssign?: boolean;
+  assignmentMethod?: 'AUTO_ROUND_ROBIN' | 'AUTO_WORKLOAD_BASED' | 'AUTO_SKILL_BASED';
+}
+
+export interface ScanDirectoryResponse {
+  tasks: Task[];
+  scannedFiles: number;
+  createdTasks: number;
+  errors: string[];
+}
+
 export interface Batch {
   id: string;
   projectId: string;
@@ -180,6 +198,20 @@ class BatchService {
    */
   async unassignTask(taskId: string): Promise<Task> {
     return taskManagementApi.post<Task>(`/tasks/${taskId}/unassign`, {});
+  }
+
+  /**
+   * TACTICAL DEMO MODE: Scan directory and create tasks
+   * Scans local directory mapped via Docker volume and creates tasks
+   */
+  async scanDirectory(
+    batchId: string,
+    options?: ScanDirectoryDto
+  ): Promise<ScanDirectoryResponse> {
+    return projectManagementApi.post<ScanDirectoryResponse>(
+      `/batches/${batchId}/scan-directory`,
+      options || {}
+    );
   }
 }
 
