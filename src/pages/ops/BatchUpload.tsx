@@ -33,6 +33,9 @@ export const BatchUpload = () => {
   const [autoAssign, setAutoAssign] = useState(true);
   const [assignmentMethod, setAssignmentMethod] = useState<'AUTO_ROUND_ROBIN' | 'AUTO_WORKLOAD_BASED' | 'AUTO_SKILL_BASED'>('AUTO_ROUND_ROBIN');
   
+  // Upload mode: 'upload' (manual files) or 'scan' (directory scan for demo)
+  const [uploadMode, setUploadMode] = useState<'upload' | 'scan'>('scan');
+  
   const [parsedFiles, setParsedFiles] = useState<ParsedFile[]>([]);
   const [csvFile, setCSVFile] = useState<File | null>(null);
   const [uploadStep, setUploadStep] = useState<'select' | 'preview' | 'uploading' | 'success' | 'error'>('select');
@@ -318,6 +321,68 @@ export const BatchUpload = () => {
     }
   };
 
+  /**
+   * TACTICAL DEMO MODE: Scan directory and create tasks
+   */
+  const handleScanDirectory = async () => {
+    if (!projectId) {
+      setErrorMessage('Please select a project first');
+      return;
+    }
+    if (!batchName.trim()) {
+      setErrorMessage('Please enter a batch name');
+      return;
+    }
+
+    if (autoAssign && teamMembers.length === 0) {
+      setErrorMessage('No team members assigned. Disable auto-assign or assign team members first.');
+      return;
+    }
+
+    setUploadStep('uploading');
+    setUploadProgress(0);
+    setErrorMessage('');
+
+    try {
+      // Step 1: Create batch
+      setUploadProgress(20);
+      const batch = await batchService.createBatch({
+        projectId,
+        name: batchName,
+        description: batchDescription,
+        priority,
+      });
+
+      setCreatedBatchId(batch.id);
+
+      // Step 2: Scan directory and create tasks
+      setUploadProgress(40);
+      const scanResult = await batchService.scanDirectory(batch.id, {
+        autoAssign,
+        assignmentMethod,
+        taskType: 'ANNOTATION',
+      });
+
+      setUploadProgress(100);
+
+      if (scanResult.errors.length > 0) {
+        console.warn('Some files had errors:', scanResult.errors);
+      }
+
+      setUploadStep('success');
+
+      // Navigate to batch details after 2 seconds
+      setTimeout(() => {
+        navigate(`/ops/batches/${batch.id}`);
+      }, 2000);
+
+    } catch (error: any) {
+      console.error('Directory scan failed:', error);
+      setErrorMessage(error.message || 'Failed to scan directory');
+      setUploadStep('error');
+    }
+  }
+
   const handleReset = () => {
     setUploadStep('select');
     setParsedFiles([]);
@@ -404,8 +469,158 @@ export const BatchUpload = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h2 className="text-xl font-semibold mb-4">Select Files to Upload</h2>
           
-          <div className="space-y-4">
-            {/* CSV Upload */}
+          {/* Mode Toggle */}
+          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="font-medium text-blue-900">Upload Mode:</label>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setUploadMode('scan')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    uploadMode === 'scan'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-blue-600 border border-blue-300 hover:bg-blue-50'
+                  }`}
+                >
+                  📁 Scan Directory (DEMO)
+                </button>
+                <button
+                  onClick={() => setUploadMode('upload')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    uploadMode === 'upload'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-blue-600 border border-blue-300 hover:bg-blue-50'
+                  }`}
+                >
+                  ⬆️ Upload Files
+                </button>
+              </div>
+            </div>
+            <p className="text-sm text-blue-700">
+              {uploadMode === 'scan' 
+                ? '📋 Directory Scan: Place files in public/uploads/{projectId}/{batchName}/ and click scan to auto-create tasks'
+                : '📤 Upload Files: Select files from your computer or provide a CSV with file references'}
+            </p>
+          </div>
+          
+          {/* DEMO MODE: Directory Scan */}
+          {uploadMode === 'scan' && (
+            <div className="space-y-4">
+              <div className="border-2 border-dashed border-green-300 rounded-lg p-8 bg-green-50">
+                <div className="text-center">
+                  <FileText className="w-16 h-16 mx-auto text-green-600 mb-4" />
+                  <h3 className="text-xl font-bold text-green-800 mb-2">Directory Scan Mode (DEMO)</h3>
+                  <p className="text-gray-700 mb-4">
+                    This mode automatically scans a local directory and creates tasks for all files found.
+                  </p>
+                  
+                  <div className="bg-white rounded-lg p-4 mb-4 text-left">
+                    <h4 className="font-semibold text-gray-800 mb-2">📝 Instructions:</h4>
+                    <ol className="list-decimal list-inside space-y-1 text-sm text-gray-700">
+                      <li>Select a project below</li>
+                      <li>Enter a batch name (e.g., "batch_001")</li>
+                      <li>Place your files in: <code className="bg-gray-100 px-2 py-1 rounded">public/uploads/{'{'} projectId{'}'}/{'{'} batchName{'}'}/</code></li>
+                      <li>Click "Continue to Configuration" below</li>
+                      <li>Click "Scan Directory & Create Tasks"</li>
+                    </ol>
+                  </div>
+
+                  <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm text-yellow-800">
+                    <strong>Note:</strong> Files must be in: <code className="bg-white px-2 py-1 rounded">welo-platform-ui/public/uploads/{'{'} projectId{'}'}/{'{'} batchName{'}'}/</code>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Configuration */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                {/* Project Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Project *
+                  </label>
+                  <select
+                    value={projectId}
+                    onChange={(e) => setProjectId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Select project...</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Batch Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Batch Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={batchName}
+                    onChange={(e) => setBatchName(e.target.value)}
+                    placeholder="e.g., batch_001"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Files should be in: public/uploads/{projectId || '{projectId}'}/{batchName || '{batchName}'}/
+                  </p>
+                </div>
+              </div>
+
+              {/* Auto-Assignment Toggle */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <label className="font-medium text-gray-700">Auto-assign tasks</label>
+                  <p className="text-sm text-gray-600">Automatically assign tasks to annotators</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoAssign}
+                    onChange={(e) => setAutoAssign(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              {autoAssign && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Assignment Method
+                  </label>
+                  <select
+                    value={assignmentMethod}
+                    onChange={(e) => setAssignmentMethod(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="AUTO_ROUND_ROBIN">Round Robin (Even Distribution)</option>
+                    <option value="AUTO_WORKLOAD_BASED">Workload Based (Assign to least busy)</option>
+                    <option value="AUTO_SKILL_BASED">Skill Based (Match skills)</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Continue Button */}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setUploadStep('preview')}
+                  disabled={!projectId || !batchName.trim()}
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+                >
+                  Continue to Configuration →
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {/* UPLOAD MODE: Manual Files */}
+          {uploadMode === 'upload' && (
+            <div className="space-y-4">
+              {/* CSV Upload */}
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors">
               <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
               <h3 className="text-lg font-medium mb-2">Upload CSV File</h3>
@@ -471,32 +686,33 @@ export const BatchUpload = () => {
               <FileText className="w-6 h-6 mx-auto mb-2 text-gray-600" />
               <span className="font-medium">Add Files Manually</span>
             </button>
-          </div>
 
-          {/* Sample CSV Format */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h4 className="font-semibold text-sm mb-2">Sample CSV Format:</h4>
-            <pre className="text-xs text-gray-700 overflow-x-auto">
+            {/* Sample CSV Format */}
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <h4 className="font-semibold text-sm mb-2">Sample CSV Format:</h4>
+              <pre className="text-xs text-gray-700 overflow-x-auto">
 {`file_name,file_type,file_url,external_id
-sample_image1.jpg,IMAGE,<YOUR_API_URL>/media/sample_image1.jpg,img_001
-sample_image2.jpg,IMAGE,<YOUR_API_URL>/media/sample_image2.jpg,img_002
-sample_text1.txt,TEXT,<YOUR_API_URL>/media/sample_text1.txt,txt_001`}
-            </pre>
-            <p className="text-xs text-gray-600 mt-2">
-              <strong>Supported file types:</strong> IMAGE, VIDEO, AUDIO, TEXT, CSV, PDF, JSON
-            </p>
-            <p className="text-xs text-blue-600 mt-2">
-              <strong>Quick Test:</strong> Download and use{' '}
-              <a 
-                href="/uploads/demo-batch.csv" 
-                download 
-                className="underline hover:text-blue-800"
-              >
-                demo-batch.csv
-              </a>
-              {' '}with pre-configured sample files
-            </p>
+sample_image1.jpg,IMAGE,http://localhost:3004/api/v1/media/sample_image1.jpg,img_001
+sample_image2.jpg,IMAGE,http://localhost:3004/api/v1/media/sample_image2.jpg,img_002
+sample_text1.txt,TEXT,http://localhost:3004/api/v1/media/sample_text1.txt,txt_001`}
+              </pre>
+              <p className="text-xs text-gray-600 mt-2">
+                <strong>Supported file types:</strong> IMAGE, VIDEO, AUDIO, TEXT, CSV, PDF, JSON
+              </p>
+              <p className="text-xs text-blue-600 mt-2">
+                <strong>Quick Test:</strong> Download and use{' '}
+                <a 
+                  href="/uploads/demo-batch.csv" 
+                  download 
+                  className="underline hover:text-blue-800"
+                >
+                  demo-batch.csv
+                </a>
+                {' '}with pre-configured sample files
+              </p>
+            </div>
           </div>
+          )}
         </div>
       )}
 
@@ -604,23 +820,24 @@ sample_text1.txt,TEXT,<YOUR_API_URL>/media/sample_text1.txt,txt_001`}
           </div>
 
           {/* Files Preview */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">
-                Files Preview ({parsedFiles.length} files)
-              </h2>
-              <button
-                onClick={handleManualAdd}
-                className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                + Add File
-              </button>
-            </div>
+          {uploadMode === 'upload' && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">
+                  Files Preview ({parsedFiles.length} files)
+                </h2>
+                <button
+                  onClick={handleManualAdd}
+                  className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  + Add File
+                </button>
+              </div>
 
-            {parsedFiles.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No files added yet</p>
-            ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              {parsedFiles.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No files added yet</p>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
                 {parsedFiles.map((file, index) => (
                   <div
                     key={index}
@@ -675,6 +892,45 @@ sample_text1.txt,TEXT,<YOUR_API_URL>/media/sample_text1.txt,txt_001`}
               </div>
             )}
           </div>
+          )}
+
+          {/* Directory Scan Mode: Confirmation */}
+          {uploadMode === 'scan' && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center mb-4">
+                <FileText className="w-6 h-6 text-green-600 mr-2" />
+                <h2 className="text-xl font-semibold">Directory Scan Confirmation</h2>
+              </div>
+              
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h3 className="font-semibold text-green-900 mb-2">📁 Ready to scan:</h3>
+                <div className="space-y-2 text-sm">
+                  <p className="flex items-center text-gray-700">
+                    <span className="font-medium mr-2">Directory path:</span>
+                    <code className="bg-white px-3 py-1 rounded border border-green-300">
+                      public/uploads/{projectId}/{batchName}/
+                    </code>
+                  </p>
+                  <p className="flex items-center text-gray-700">
+                    <span className="font-medium mr-2">Auto-assign:</span>
+                    <span className={autoAssign ? 'text-green-600 font-medium' : 'text-gray-500'}>
+                      {autoAssign ? `✅ Yes (${assignmentMethod})` : '❌ No (Manual assignment)'}
+                    </span>
+                  </p>
+                </div>
+              </div>
+              
+              <div className="mt-4 bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
+                <strong>💡 What happens next:</strong>
+                <ul className="list-disc list-inside mt-2 space-y-1">
+                  <li>Backend will scan the directory for all files</li>
+                  <li>Tasks will be auto-created for each file found</li>
+                  <li>File URLs will point to: <code>http://localhost:3004/api/v1/media/...</code></li>
+                  {autoAssign && <li>Tasks will be automatically assigned to team members</li>}
+                </ul>
+              </div>
+            </div>
+          )}
 
           {/* Project Team Members */}
           {projectId && (
@@ -759,14 +1015,26 @@ sample_text1.txt,TEXT,<YOUR_API_URL>/media/sample_text1.txt,txt_001`}
             >
               Start Over
             </button>
-            <button
-              onClick={handleSubmit}
-              disabled={parsedFiles.length === 0 || !projectId || !batchName.trim() || (autoAssign && teamMembers.length === 0)}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              title={parsedFiles.length === 0 ? 'Add files first' : !projectId ? 'Select a project' : !batchName.trim() ? 'Enter batch name' : (autoAssign && teamMembers.length === 0) ? 'Assign team members or disable auto-assign' : 'Create batch'}
-            >
-              Create Batch & Upload Files
-            </button>
+            
+            {uploadMode === 'upload' ? (
+              <button
+                onClick={handleSubmit}
+                disabled={parsedFiles.length === 0 || !projectId || !batchName.trim() || (autoAssign && teamMembers.length === 0)}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title={parsedFiles.length === 0 ? 'Add files first' : !projectId ? 'Select a project' : !batchName.trim() ? 'Enter batch name' : (autoAssign && teamMembers.length === 0) ? 'Assign team members or disable auto-assign' : 'Create batch'}
+              >
+                ⬆️ Create Batch & Upload Files
+              </button>
+            ) : (
+              <button
+                onClick={handleScanDirectory}
+                disabled={!projectId || !batchName.trim() || (autoAssign && teamMembers.length === 0)}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title={!projectId ? 'Select a project' : !batchName.trim() ? 'Enter batch name' : (autoAssign && teamMembers.length === 0) ? 'Assign team members or disable auto-assign' : 'Scan directory and create tasks'}
+              >
+                📁 Scan Directory & Create Tasks
+              </button>
+            )}
           </div>
         </div>
       )}
