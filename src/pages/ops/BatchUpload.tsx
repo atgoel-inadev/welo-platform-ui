@@ -140,7 +140,7 @@ export const BatchUpload = () => {
       
       // For demo, we'll use the file name and construct the URL
       // The file should be manually placed in public/uploads or use a file input workaround
-      const backendUrl = `http://localhost:3004/api/v1/media/${file.name}`;
+      const backendUrl = `${import.meta.env.VITE_PROJECT_MANAGEMENT_URL}/media/${file.name}`;
       
       // Store file in browser's temporary storage (for demo simulation)
       const reader = new FileReader();
@@ -154,7 +154,7 @@ export const BatchUpload = () => {
       });
     } catch (error) {
       console.error('Error copying file:', error);
-      return `http://localhost:3004/api/v1/media/${file.name}`;
+      return `${import.meta.env.VITE_PROJECT_MANAGEMENT_URL}/media/${file.name}`;
     }
   };
 

@@ -81,7 +81,7 @@ class WorkflowService {
     const url = queryString ? `/workflows?${queryString}` : '/workflows';
     
     const response = await workflowEngineApi.get<BackendResponse<Workflow[]>>(url);
-    return response.data;
+    return Array.isArray(response) ? response : (response.data ?? []);
   }
 
   /**

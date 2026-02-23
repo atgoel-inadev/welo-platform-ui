@@ -1,10 +1,10 @@
 /**
- * Canvas Area Component - Improved with Flex/Grid Layout
- * Main editing canvas for positioning and arranging widgets
+ * Canvas Area Component
+ * Professional editing canvas with flex/grid layout and polished widget cards
  */
 
 import { useState, useCallback } from 'react';
-import { Trash2, MoveUp, MoveDown, ChevronRight } from 'lucide-react';
+import { Trash2, GripVertical, ChevronUp, ChevronDown, ChevronRight, Layers } from 'lucide-react';
 import { UIConfiguration, Widget, QuestionWidget } from '../../types/uiBuilder';
 
 interface CanvasAreaProps {
@@ -28,204 +28,135 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
 
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
-      if (e.target === e.currentTarget) {
-        onSelectWidget(null);
-      }
+      if (e.target === e.currentTarget) onSelectWidget(null);
     },
-    [onSelectWidget]
+    [onSelectWidget],
   );
 
   const handleMoveUp = useCallback(
     (widget: Widget) => {
-      // Work with sorted widgets to get the actual visual order
-      const sortedWidgets = [...configuration.widgets].sort((a, b) => a.order - b.order);
-      const currentIndex = sortedWidgets.findIndex((w) => w.id === widget.id);
-      
-      if (currentIndex > 0) {
-        const prevWidget = sortedWidgets[currentIndex - 1];
-        // Swap order values
-        onUpdateWidget(widget.id, { order: prevWidget.order });
-        onUpdateWidget(prevWidget.id, { order: widget.order });
+      const sorted = [...configuration.widgets].sort((a, b) => a.order - b.order);
+      const idx = sorted.findIndex((w) => w.id === widget.id);
+      if (idx > 0) {
+        const prev = sorted[idx - 1];
+        onUpdateWidget(widget.id, { order: prev.order });
+        onUpdateWidget(prev.id, { order: widget.order });
       }
     },
-    [configuration.widgets, onUpdateWidget]
+    [configuration.widgets, onUpdateWidget],
   );
 
   const handleMoveDown = useCallback(
     (widget: Widget) => {
-      // Work with sorted widgets to get the actual visual order
-      const sortedWidgets = [...configuration.widgets].sort((a, b) => a.order - b.order);
-      const currentIndex = sortedWidgets.findIndex((w) => w.id === widget.id);
-      
-      if (currentIndex < sortedWidgets.length - 1) {
-        const nextWidget = sortedWidgets[currentIndex + 1];
-        // Swap order values
-        onUpdateWidget(widget.id, { order: nextWidget.order });
-        onUpdateWidget(nextWidget.id, { order: widget.order });
+      const sorted = [...configuration.widgets].sort((a, b) => a.order - b.order);
+      const idx = sorted.findIndex((w) => w.id === widget.id);
+      if (idx < sorted.length - 1) {
+        const next = sorted[idx + 1];
+        onUpdateWidget(widget.id, { order: next.order });
+        onUpdateWidget(next.id, { order: widget.order });
       }
     },
-    [configuration.widgets, onUpdateWidget]
+    [configuration.widgets, onUpdateWidget],
   );
 
+  /* ── Layout styles ──────────────────────────────────────────────────── */
   const getContainerStyle = (): React.CSSProperties => {
     const layout = configuration.layout;
-    
+    const gap = layout.gap || 12;
+    const maxW = layout.maxWidth || 800;
+
+    const base: React.CSSProperties = { margin: '0 auto', maxWidth: `${maxW}px` };
+
     switch (layout.type) {
       case 'grid':
-        return {
-          display: 'grid',
-          gridTemplateColumns: `repeat(${layout.columns || 2}, 1fr)`,
-          gap: `${layout.gap || 16}px`,
-          maxWidth: `${layout.maxWidth || 1200}px`,
-          margin: '0 auto',
-        };
-      case 'flex-vertical':
-        return {
-          display: 'flex',
-          flexDirection: 'column',
-          gap: `${layout.gap || 16}px`,
-          maxWidth: `${layout.maxWidth || 800}px`,
-          margin: '0 auto',
-        };
+        return { ...base, display: 'grid', gridTemplateColumns: `repeat(${layout.columns || 2}, 1fr)`, gap: `${gap}px` };
       case 'flex-horizontal':
-        return {
-          display: 'flex',
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: `${layout.gap || 16}px`,
-          maxWidth: `${layout.maxWidth || 1200}px`,
-          margin: '0 auto',
-        };
+        return { ...base, display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: `${gap}px`, maxWidth: `${maxW}px` };
       case 'two-column':
-        return {
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: `${layout.gap || 16}px`,
-          maxWidth: `${layout.maxWidth || 1200}px`,
-          margin: '0 auto',
-        };
+        return { ...base, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${gap}px` };
       case 'three-column':
-        return {
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: `${layout.gap || 16}px`,
-          maxWidth: `${layout.maxWidth || 1200}px`,
-          margin: '0 auto',
-        };
+        return { ...base, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: `${gap}px` };
       default:
-        return {
-          display: 'flex',
-          flexDirection: 'column',
-          gap: `${layout.gap || 16}px`,
-          maxWidth: `${layout.maxWidth || 800}px`,
-          margin: '0 auto',
-        };
+        return { ...base, display: 'flex', flexDirection: 'column', gap: `${gap}px` };
     }
   };
 
-  const getWidgetStyle = (widget: Widget): React.CSSProperties => {
-    const baseStyle: React.CSSProperties = {
-      border: selectedWidget?.id === widget.id ? '2px solid #3B82F6' : '1px solid #E5E7EB',
-      borderRadius: '8px',
-      backgroundColor: 'white',
-      padding: '16px',
-      minHeight: '60px',
-      boxShadow: selectedWidget?.id === widget.id 
-        ? '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-        : hoveredWidget === widget.id
-        ? '0 2px 4px rgba(0, 0, 0, 0.08)'
-        : '0 1px 2px rgba(0, 0, 0, 0.05)',
-      cursor: 'pointer',
-      transition: 'all 0.2s',
-      position: 'relative',
-      ...widget.style,
-    };
+  /* ── Widget card style ──────────────────────────────────────────────── */
+  const isSelected = (w: Widget) => selectedWidget?.id === w.id;
+  const isHovered = (w: Widget) => hoveredWidget === w.id;
 
-    // Apply size preset
+  const cardClass = (widget: Widget) => {
+    const sel = isSelected(widget);
+    const hov = isHovered(widget);
+    let cls =
+      'relative rounded-xl transition-all duration-150 cursor-pointer group border bg-white';
+    if (sel) cls += ' border-indigo-400 ring-2 ring-indigo-200/60 shadow-md';
+    else if (hov) cls += ' border-slate-300 shadow-sm';
+    else cls += ' border-slate-200 shadow-[0_1px_2px_rgba(0,0,0,0.04)]';
+    return cls;
+  };
+
+  const getWidgetPadding = (widget: Widget) => {
+    if (widget.type === 'DIVIDER' || widget.type === 'SPACER') return 'px-4 py-1';
+    return 'p-4';
+  };
+
+  const getSizeStyle = (widget: Widget): React.CSSProperties => {
+    const s: React.CSSProperties = { minHeight: '48px' };
     if (widget.sizePreset) {
       switch (widget.sizePreset) {
-        case 'small':
-          baseStyle.width = '300px';
-          baseStyle.maxWidth = '100%';
-          break;
-        case 'medium':
-          baseStyle.width = '500px';
-          baseStyle.maxWidth = '100%';
-          break;
-        case 'large':
-          baseStyle.width = '700px';
-          baseStyle.maxWidth = '100%';
-          break;
-        case 'full-width':
-          baseStyle.width = '100%';
-          baseStyle.gridColumn = 'span 1 / -1'; // Span all columns in grid
-          break;
-        case 'custom':
-          baseStyle.width = `${widget.size.width}px`;
-          baseStyle.minHeight = `${widget.size.height}px`;
-          break;
+        case 'small': s.width = '280px'; s.maxWidth = '100%'; break;
+        case 'medium': s.width = '480px'; s.maxWidth = '100%'; break;
+        case 'large': s.width = '100%'; break;
+        case 'full-width': s.width = '100%'; s.gridColumn = '1 / -1'; break;
+        case 'custom': s.width = `${widget.size.width}px`; s.minHeight = `${widget.size.height}px`; break;
       }
     }
-
-    return baseStyle;
+    return s;
   };
 
+  /* ── Widget previews ────────────────────────────────────────────────── */
   const renderWidgetPreview = (widget: Widget) => {
     switch (widget.type) {
       case 'FILE_VIEWER':
         return (
-          <div className="flex items-center justify-center h-48 bg-gradient-to-br from-gray-50 to-gray-100 rounded border-2 border-dashed border-gray-300">
+          <div className="flex items-center justify-center h-40 bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border border-dashed border-slate-300">
             <div className="text-center">
-              <div className="text-4xl mb-2">📁</div>
-              <span className="text-gray-600 font-medium">File Viewer Area</span>
-              <p className="text-xs text-gray-500 mt-1">File content will be displayed here</p>
+              <Layers className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+              <span className="text-sm font-medium text-slate-600">File Viewer</span>
+              <p className="text-[11px] text-slate-400 mt-1">Renders uploaded file content</p>
             </div>
           </div>
         );
 
       case 'QUESTION':
         return (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <div className="text-sm text-gray-500 mb-1">Question Widget</div>
-                <div className="text-xs text-gray-400">
-                  {(widget as QuestionWidget).renderMode === 'paginated' ? '📄 Paginated' : '📋 All Questions'}
-                </div>
-              </div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wider">Question Widget</span>
               {(widget as QuestionWidget).showProgress && (
-                <div className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                  Question 1 of {'{N}'}
-                </div>
+                <span className="text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">Q1 of N</span>
               )}
             </div>
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="font-medium text-gray-900 mb-3">
-                Example: What is the sentiment of this text? <span className="text-red-500">*</span>
-              </div>
-              <div className="space-y-2">
-                <label className="flex items-center">
-                  <input type="radio" className="mr-2" disabled />
-                  <span className="text-sm">Positive</span>
-                </label>
-                <label className="flex items-center">
-                  <input type="radio" className="mr-2" disabled />
-                  <span className="text-sm">Negative</span>
-                </label>
-                <label className="flex items-center">
-                  <input type="radio" className="mr-2" disabled />
-                  <span className="text-sm">Neutral</span>
-                </label>
+            <div className="p-3 bg-indigo-50/60 border border-indigo-100 rounded-lg">
+              <p className="text-sm font-medium text-slate-800 mb-2.5">
+                What is the sentiment? <span className="text-red-500">*</span>
+              </p>
+              <div className="space-y-1.5">
+                {['Positive', 'Negative', 'Neutral'].map((o) => (
+                  <label key={o} className="flex items-center gap-2 text-sm text-slate-600">
+                    <span className="w-3.5 h-3.5 rounded-full border-2 border-slate-300" />
+                    {o}
+                  </label>
+                ))}
               </div>
             </div>
             {(widget as QuestionWidget).showNavigation && (
-              <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
-                <button className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-md" disabled>
-                  Previous
-                </button>
-                <button className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md flex items-center gap-2" disabled>
-                  Next <ChevronRight size={16} />
-                </button>
+              <div className="flex justify-between pt-2 border-t border-slate-100">
+                <span className="text-[11px] text-slate-400 px-3 py-1 bg-slate-50 rounded">Previous</span>
+                <span className="text-[11px] text-white px-3 py-1 bg-indigo-500 rounded flex items-center gap-1">
+                  Next <ChevronRight size={10} />
+                </span>
               </div>
             )}
           </div>
@@ -235,18 +166,14 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
         return (
           <div>
             {widget.label && (
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {widget.label}
-                {widget.required && <span className="text-red-500 ml-1">*</span>}
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                {widget.label}{widget.required && <span className="text-red-500 ml-0.5">*</span>}
               </label>
             )}
-            <input
-              type="text"
-              placeholder={widget.placeholder || 'Enter text...'}
-              disabled
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-            />
-            {widget.helpText && <p className="text-xs text-gray-500 mt-1">{widget.helpText}</p>}
+            <div className="w-full h-9 px-3 flex items-center border border-slate-200 rounded-lg bg-slate-50 text-xs text-slate-400">
+              {widget.placeholder || 'Enter text…'}
+            </div>
+            {widget.helpText && <p className="text-[10px] text-slate-400 mt-1">{widget.helpText}</p>}
           </div>
         );
 
@@ -254,85 +181,95 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
         return (
           <div>
             {widget.label && (
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {widget.label}
-                {widget.required && <span className="text-red-500 ml-1">*</span>}
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                {widget.label}{widget.required && <span className="text-red-500 ml-0.5">*</span>}
               </label>
             )}
-            <textarea
-              placeholder={widget.placeholder || 'Enter text...'}
-              disabled
-              rows={(widget as any).rows || 4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 resize-none"
-            />
-            {widget.helpText && <p className="text-xs text-gray-500 mt-1">{widget.helpText}</p>}
+            <div className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-xs text-slate-400"
+                 style={{ minHeight: `${((widget as any).rows || 3) * 20}px` }}>
+              {widget.placeholder || 'Enter text…'}
+            </div>
+            {widget.helpText && <p className="text-[10px] text-slate-400 mt-1">{widget.helpText}</p>}
           </div>
         );
 
       case 'SELECT':
-      case 'MULTI_SELECT':
+      case 'MULTI_SELECT': {
+        const selOpts: { id: string; label: string }[] = ((widget as any).options || []).map((o: any) =>
+          typeof o === 'string' ? { id: o, label: o } : o,
+        );
         return (
           <div>
             {widget.label && (
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {widget.label}
-                {widget.required && <span className="text-red-500 ml-1">*</span>}
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                {widget.label}{widget.required && <span className="text-red-500 ml-0.5">*</span>}
               </label>
             )}
-            <select disabled className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
-              <option>{widget.placeholder || 'Select option...'}</option>
-            </select>
-            {widget.helpText && <p className="text-xs text-gray-500 mt-1">{widget.helpText}</p>}
+            <div className="w-full h-9 px-3 flex items-center justify-between border border-slate-200 rounded-lg bg-slate-50 text-xs text-slate-400">
+              <span>{widget.placeholder || 'Select…'}</span>
+              <ChevronDown size={12} className="text-slate-400" />
+            </div>
+            {selOpts.length > 0 && (
+              <div className="mt-1.5 space-y-1">
+                {selOpts.map((o) => (
+                  <div key={o.id} className="flex items-center gap-2 px-2 py-1 rounded text-xs text-slate-500">
+                    {widget.type === 'MULTI_SELECT'
+                      ? <span className="w-3 h-3 rounded border border-slate-300 flex-shrink-0" />
+                      : <span className="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0" />}
+                    <span>{o.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
+      }
 
-      case 'RADIO_GROUP':
+      case 'RADIO_GROUP': {
+        const radioOpts: { id: string; label: string }[] = ((widget as any).options || []).map((o: any) =>
+          typeof o === 'string' ? { id: o, label: o } : o,
+        );
+        const displayOpts = radioOpts.length > 0
+          ? radioOpts
+          : [{ id: '1', label: 'Option 1' }, { id: '2', label: 'Option 2' }, { id: '3', label: 'Option 3' }];
         return (
           <div>
             {widget.label && (
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                {widget.label}
-                {widget.required && <span className="text-red-500 ml-1">*</span>}
+              <label className="block text-xs font-medium text-slate-700 mb-2">
+                {widget.label}{widget.required && <span className="text-red-500 ml-0.5">*</span>}
               </label>
             )}
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center">
-                  <input type="radio" disabled className="mr-2" />
-                  <span className="text-sm text-gray-700">Option {i}</span>
+            <div className="space-y-1.5">
+              {displayOpts.map((o) => (
+                <div key={o.id} className="flex items-center gap-2">
+                  <span className="w-3.5 h-3.5 rounded-full border-2 border-slate-300" />
+                  <span className="text-xs text-slate-600">{o.label}</span>
                 </div>
               ))}
             </div>
-            {widget.helpText && <p className="text-xs text-gray-500 mt-2">{widget.helpText}</p>}
           </div>
         );
+      }
 
       case 'CHECKBOX':
         return (
-          <div className="flex items-center">
-            <input type="checkbox" disabled className="mr-2" />
-            <label className="text-sm font-medium text-gray-700">
-              {widget.label || 'Checkbox label'}
-              {widget.required && <span className="text-red-500 ml-1">*</span>}
-            </label>
-          </div>
+          <label className="flex items-center gap-2">
+            <span className="w-4 h-4 rounded border-2 border-slate-300" />
+            <span className="text-xs font-medium text-slate-700">{widget.label || 'Checkbox label'}</span>
+          </label>
         );
 
       case 'RATING':
         return (
           <div>
             {widget.label && (
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {widget.label}
-                {widget.required && <span className="text-red-500 ml-1">*</span>}
-              </label>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">{widget.label}</label>
             )}
-            <div className="flex gap-1">
+            <div className="flex gap-0.5">
               {Array.from({ length: (widget as any).maxRating || 5 }).map((_, i) => (
-                <span key={i} className="text-2xl text-yellow-400">★</span>
+                <span key={i} className="text-lg text-amber-400">★</span>
               ))}
             </div>
-            {widget.helpText && <p className="text-xs text-gray-500 mt-1">{widget.helpText}</p>}
           </div>
         );
 
@@ -340,22 +277,16 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
         return (
           <div>
             {widget.label && (
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {widget.label}
-              </label>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">{widget.label}</label>
             )}
-            <input
-              type="range"
-              disabled
-              className="w-full"
-              min={(widget as any).min || 0}
-              max={(widget as any).max || 100}
-            />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <div className="relative h-1.5 bg-slate-200 rounded-full mt-2">
+              <div className="absolute left-0 top-0 h-full w-1/3 bg-indigo-500 rounded-full" />
+              <div className="absolute left-[33%] top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white border-2 border-indigo-500 rounded-full shadow-sm" />
+            </div>
+            <div className="flex justify-between text-[10px] text-slate-400 mt-1">
               <span>{(widget as any).min || 0}</span>
               <span>{(widget as any).max || 100}</span>
             </div>
-            {widget.helpText && <p className="text-xs text-gray-500 mt-1">{widget.helpText}</p>}
           </div>
         );
 
@@ -363,55 +294,54 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
         return (
           <div>
             {widget.label && (
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {widget.label}
-                {widget.required && <span className="text-red-500 ml-1">*</span>}
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                {widget.label}{widget.required && <span className="text-red-500 ml-0.5">*</span>}
               </label>
             )}
-            <input
-              type="date"
-              disabled
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-            />
-            {widget.helpText && <p className="text-xs text-gray-500 mt-1">{widget.helpText}</p>}
+            <div className="w-full h-9 px-3 flex items-center border border-slate-200 rounded-lg bg-slate-50 text-xs text-slate-400">
+              mm/dd/yyyy
+            </div>
           </div>
         );
 
       case 'INSTRUCTION_TEXT':
         return (
-          <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <span className="text-blue-600 text-xl">ℹ️</span>
-            <div className="flex-1">
-              <p className="text-sm text-gray-700">{(widget as any).content || 'Instructions...'}</p>
-            </div>
+          <div className="flex items-start gap-2.5 p-3 bg-blue-50/70 border border-blue-100 rounded-lg">
+            <span className="text-blue-500 text-sm leading-none mt-0.5">ℹ</span>
+            <p className="text-xs text-slate-600 leading-relaxed">{(widget as any).content || 'Instructions…'}</p>
           </div>
         );
 
       case 'DIVIDER':
-        return <div className="w-full h-px bg-gray-300"></div>;
+        return <div className="w-full h-px bg-slate-200" />;
 
       case 'SPACER':
-        return <div style={{ height: `${(widget as any).height || 20}px` }} className="bg-gray-50"></div>;
+        return (
+          <div
+            style={{ height: `${(widget as any).height || 20}px` }}
+            className="bg-slate-50 border border-dashed border-slate-200 rounded"
+          />
+        );
 
       default:
-        return (
-          <div className="text-sm text-gray-500 italic">
-            Unknown widget type: {widget.type}
-          </div>
-        );
+        return <div className="text-xs text-slate-400 italic">Unknown: {widget.type}</div>;
     }
   };
 
   const sortedWidgets = [...configuration.widgets].sort((a, b) => a.order - b.order);
 
+  /* ── Empty state ────────────────────────────────────────────────────── */
   if (sortedWidgets.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center bg-white rounded-lg border-2 border-dashed border-gray-300" onClick={handleCanvasClick}>
-        <div className="text-center">
-          <div className="text-6xl mb-4">🎨</div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Empty Canvas</h3>
-          <p className="text-sm text-gray-500 max-w-sm">
-            Add widgets from the left panel to start building your annotation interface.
+      <div
+        className="h-full flex items-center justify-center bg-white/50 m-3 rounded-xl border-2 border-dashed border-slate-200"
+        onClick={handleCanvasClick}
+      >
+        <div className="text-center max-w-xs">
+          <Layers className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-sm font-semibold text-slate-700 mb-1">Empty Canvas</h3>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Click widgets from the left panel to start building your annotation interface.
           </p>
         </div>
       </div>
@@ -419,69 +349,70 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
   }
 
   return (
-    <div className="h-full overflow-auto bg-gray-50 p-8" onClick={handleCanvasClick}>
+    <div className="h-full overflow-auto p-6 bg-slate-50/50" onClick={handleCanvasClick}>
       <div style={getContainerStyle()}>
         {sortedWidgets.map((widget, index) => (
           <div
             key={widget.id}
-            style={getWidgetStyle(widget)}
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelectWidget(widget.id);
-            }}
+            style={getSizeStyle(widget)}
+            className={cardClass(widget)}
+            onClick={(e) => { e.stopPropagation(); onSelectWidget(widget.id); }}
             onMouseEnter={() => setHoveredWidget(widget.id)}
             onMouseLeave={() => setHoveredWidget(null)}
-            className="group"
           >
-            {/* Widget Controls */}
-            {(selectedWidget?.id === widget.id || hoveredWidget === widget.id) && (
-              <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                {index > 0 && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleMoveUp(widget);
-                    }}
-                    className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50"
-                    title="Move up"
-                  >
-                    <MoveUp size={14} />
-                  </button>
-                )}
-                {index < sortedWidgets.length - 1 && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleMoveDown(widget);
-                    }}
-                    className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50"
-                    title="Move down"
-                  >
-                    <MoveDown size={14} />
-                  </button>
-                )}
+            {/* Widget type badge (shown only when selected) */}
+            {isSelected(widget) && (
+              <div className="absolute -top-2.5 left-3 z-10">
+                <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold bg-indigo-600 text-white rounded-md shadow-sm">
+                  {widget.type.replace(/_/g, ' ')}
+                </span>
+              </div>
+            )}
+
+            {/* Toolbar overlay */}
+            <div
+              className={`absolute top-1.5 right-1.5 z-10 flex items-center gap-0.5 transition-opacity duration-100 ${
+                isSelected(widget) || isHovered(widget) ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              }`}
+            >
+              {index > 0 && (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteWidget(widget.id);
-                  }}
-                  className="p-1.5 bg-white border border-red-300 rounded hover:bg-red-50 text-red-600"
-                  title="Delete"
+                  onClick={(e) => { e.stopPropagation(); handleMoveUp(widget); }}
+                  className="p-1 rounded-md bg-white/90 border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-white shadow-sm"
+                  title="Move up"
                 >
-                  <Trash2 size={14} />
+                  <ChevronUp size={13} />
                 </button>
+              )}
+              {index < sortedWidgets.length - 1 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleMoveDown(widget); }}
+                  className="p-1 rounded-md bg-white/90 border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-white shadow-sm"
+                  title="Move down"
+                >
+                  <ChevronDown size={13} />
+                </button>
+              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); onDeleteWidget(widget.id); }}
+                className="p-1 rounded-md bg-white/90 border border-red-200 text-red-400 hover:text-red-600 hover:bg-red-50 shadow-sm"
+                title="Delete"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+
+            {/* Grip indicator */}
+            {(isSelected(widget) || isHovered(widget)) && (
+              <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-40">
+                <GripVertical size={12} className="text-slate-400" />
               </div>
             )}
 
-            {/* Widget Badge */}
-            {selectedWidget?.id === widget.id && (
-              <div className="absolute -top-3 left-3 px-2 py-0.5 bg-blue-600 text-white text-xs font-medium rounded-full">
-                {widget.type.replace('_', ' ')}
-              </div>
-            )}
-
-            {/* Widget Content */}
-            {renderWidgetPreview(widget)}
+            {/* Content */}
+            <div className={getWidgetPadding(widget)}>
+              {renderWidgetPreview(widget)}
+            </div>
           </div>
         ))}
       </div>

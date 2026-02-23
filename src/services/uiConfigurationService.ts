@@ -5,7 +5,7 @@
 
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export interface UIConfiguration {
   id?: string;
@@ -58,7 +58,7 @@ export const createUIConfiguration = async (
   }
 ): Promise<UIConfigurationResponse> => {
   const response = await axios.post(
-    `${API_BASE_URL}/api/v1/projects/${projectId}/ui-configurations`,
+    `${API_BASE_URL}/projects/${projectId}/ui-configurations`,
     config
   );
   return response.data;
@@ -69,7 +69,7 @@ export const createUIConfiguration = async (
  */
 export const getUIConfiguration = async (projectId: string): Promise<UIConfigurationResponse> => {
   const response = await axios.get(
-    `${API_BASE_URL}/api/v1/projects/${projectId}/ui-configurations`
+    `${API_BASE_URL}/projects/${projectId}/ui-configurations`
   );
   return response.data;
 };
@@ -86,7 +86,7 @@ export const updateUIConfiguration = async (
   }
 ): Promise<UIConfigurationResponse> => {
   const response = await axios.put(
-    `${API_BASE_URL}/api/v1/projects/${projectId}/ui-configurations`,
+    `${API_BASE_URL}/projects/${projectId}/ui-configurations`,
     config
   );
   return response.data;
@@ -99,7 +99,7 @@ export const getUIConfigurationVersions = async (
   projectId: string
 ): Promise<UIConfigurationVersion[]> => {
   const response = await axios.get(
-    `${API_BASE_URL}/api/v1/projects/${projectId}/ui-configurations/versions`
+    `${API_BASE_URL}/projects/${projectId}/ui-configurations/versions`
   );
   return response.data;
 };
@@ -112,7 +112,7 @@ export const getUIConfigurationVersion = async (
   version: string
 ): Promise<UIConfigurationResponse> => {
   const response = await axios.get(
-    `${API_BASE_URL}/api/v1/projects/${projectId}/ui-configurations/versions/${version}`
+    `${API_BASE_URL}/projects/${projectId}/ui-configurations/versions/${version}`
   );
   return response.data;
 };
@@ -125,7 +125,7 @@ export const rollbackUIConfiguration = async (
   version: string
 ): Promise<UIConfigurationResponse> => {
   const response = await axios.post(
-    `${API_BASE_URL}/api/v1/projects/${projectId}/ui-configurations/versions/${version}/rollback`
+    `${API_BASE_URL}/projects/${projectId}/ui-configurations/versions/${version}/rollback`
   );
   return response.data;
 };
@@ -134,7 +134,7 @@ export const rollbackUIConfiguration = async (
  * Delete UI configuration
  */
 export const deleteUIConfiguration = async (projectId: string): Promise<void> => {
-  await axios.delete(`${API_BASE_URL}/api/v1/projects/${projectId}/ui-configurations`);
+  await axios.delete(`${API_BASE_URL}/projects/${projectId}/ui-configurations`);
 };
 
 /**

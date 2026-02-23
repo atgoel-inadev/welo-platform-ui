@@ -96,7 +96,7 @@ export const WorkflowManagement = () => {
           </Button>
         </div>
 
-        {workflows.length === 0 ? (
+        {(!workflows || workflows.length === 0) ? (
           <div className="bg-white rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
             <WorkflowIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No Workflows Yet</h3>

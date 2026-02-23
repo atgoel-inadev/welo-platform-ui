@@ -1,11 +1,11 @@
 /**
  * Property Panel Component
- * Configuration panel for selected widget properties
+ * Clean, collapsible configuration panel for selected widget properties
  */
 
-import { Trash2, Plus, X } from 'lucide-react';
+import { useState } from 'react';
+import { Trash2, Plus, X, ChevronDown, ChevronRight, Settings2, Sliders, Move } from 'lucide-react';
 import { Widget, WidgetOption } from '../../types/uiBuilder';
-import { Button, FormInput } from '../common';
 
 interface PropertyPanelProps {
   widget: Widget;
@@ -13,209 +13,227 @@ interface PropertyPanelProps {
   onDelete: () => void;
 }
 
-export const PropertyPanel: React.FC<PropertyPanelProps> = ({ widget, onUpdate, onDelete }) => {
-  // const [showAdvanced, setShowAdvanced] = useState(false);
+/* ── Shared small components ──────────────────────────────────────────────── */
 
+const SectionHeader: React.FC<{
+  title: string;
+  icon?: React.ReactNode;
+  open: boolean;
+  onToggle: () => void;
+}> = ({ title, icon, open, onToggle }) => (
+  <button
+    onClick={onToggle}
+    className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50/80 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wider hover:bg-slate-100/80 transition-colors"
+  >
+    <span className="flex items-center gap-2">
+      {icon}
+      {title}
+    </span>
+    {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+  </button>
+);
+
+const Field: React.FC<{
+  label: string;
+  children: React.ReactNode;
+  hint?: string;
+}> = ({ label, children, hint }) => (
+  <div>
+    <label className="block text-[11px] font-medium text-slate-600 mb-1">{label}</label>
+    {children}
+    {hint && <p className="text-[10px] text-slate-400 mt-0.5">{hint}</p>}
+  </div>
+);
+
+const inputClass =
+  'w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-800 ' +
+  'placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all';
+
+const selectClass =
+  'w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-800 ' +
+  'focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all';
+
+/* ── Main Panel ───────────────────────────────────────────────────────────── */
+
+export const PropertyPanel: React.FC<PropertyPanelProps> = ({ widget, onUpdate, onDelete }) => {
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    basic: true,
+    type: true,
+    position: false,
+  });
+
+  const toggle = (key: string) => setOpenSections((s) => ({ ...s, [key]: !s[key] }));
+
+  /* ── Basic props ─────────────────────────────────────────────────────── */
   const renderBasicProperties = () => (
-    <div className="space-y-4">
-      {/* Size Preset */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Widget Size</label>
+    <div className="px-4 py-3 space-y-3">
+      <Field label="Size Preset">
         <select
           value={widget.sizePreset || 'medium'}
           onChange={(e) => onUpdate({ sizePreset: e.target.value as any })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+          className={selectClass}
         >
-          <option value="small">Small (300px)</option>
-          <option value="medium">Medium (500px)</option>
-          <option value="large">Large (700px)</option>
+          <option value="small">Small (280 px)</option>
+          <option value="medium">Medium (480 px)</option>
+          <option value="large">Large (full)</option>
           <option value="full-width">Full Width</option>
           <option value="custom">Custom</option>
         </select>
-        {widget.sizePreset === 'custom' && (
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <FormInput
-              label="Width (px)"
+      </Field>
+
+      {widget.sizePreset === 'custom' && (
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Width (px)">
+            <input
               type="number"
               value={widget.size.width}
               onChange={(e) => onUpdate({ size: { ...widget.size, width: parseInt(e.target.value) } })}
               min={50}
+              className={inputClass}
             />
-            <FormInput
-              label="Height (px)"
+          </Field>
+          <Field label="Height (px)">
+            <input
               type="number"
               value={widget.size.height}
               onChange={(e) => onUpdate({ size: { ...widget.size, height: parseInt(e.target.value) } })}
               min={30}
+              className={inputClass}
             />
-          </div>
-        )}
-      </div>
+          </Field>
+        </div>
+      )}
 
-      <FormInput
-        label="Label"
-        value={widget.label || ''}
-        onChange={(e) => onUpdate({ label: e.target.value })}
-        placeholder="Enter label..."
-      />
+      <Field label="Label">
+        <input
+          type="text"
+          value={widget.label || ''}
+          onChange={(e) => onUpdate({ label: e.target.value })}
+          placeholder="Label…"
+          className={inputClass}
+        />
+      </Field>
 
-      {widget.type !== 'INSTRUCTION_TEXT' && widget.type !== 'DIVIDER' && widget.type !== 'SPACER' && (
+      {!['INSTRUCTION_TEXT', 'DIVIDER', 'SPACER'].includes(widget.type) && (
         <>
-          <FormInput
-            label="Placeholder"
-            value={widget.placeholder || ''}
-            onChange={(e) => onUpdate({ placeholder: e.target.value })}
-            placeholder="Enter placeholder..."
-          />
+          <Field label="Placeholder">
+            <input
+              type="text"
+              value={widget.placeholder || ''}
+              onChange={(e) => onUpdate({ placeholder: e.target.value })}
+              placeholder="Placeholder…"
+              className={inputClass}
+            />
+          </Field>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Help Text</label>
+          <Field label="Help Text">
             <textarea
               value={widget.helpText || ''}
               onChange={(e) => onUpdate({ helpText: e.target.value })}
               rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-              placeholder="Additional help text..."
+              placeholder="Additional help…"
+              className={inputClass + ' resize-none'}
             />
-          </div>
+          </Field>
         </>
       )}
 
-      <div className="flex items-center gap-4">
-        <label className="flex items-center">
+      <div className="flex items-center gap-4 pt-1">
+        <label className="flex items-center gap-1.5 cursor-pointer">
           <input
             type="checkbox"
             checked={widget.required || false}
             onChange={(e) => onUpdate({ required: e.target.checked })}
-            className="mr-2"
+            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
           />
-          <span className="text-sm text-gray-700">Required</span>
+          <span className="text-[11px] text-slate-600">Required</span>
         </label>
-
-        <label className="flex items-center">
+        <label className="flex items-center gap-1.5 cursor-pointer">
           <input
             type="checkbox"
             checked={widget.disabled || false}
             onChange={(e) => onUpdate({ disabled: e.target.checked })}
-            className="mr-2"
+            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
           />
-          <span className="text-sm text-gray-700">Disabled</span>
+          <span className="text-[11px] text-slate-600">Disabled</span>
         </label>
       </div>
     </div>
   );
 
+  /* ── Type-specific props ─────────────────────────────────────────────── */
   const renderTypeSpecificProperties = () => {
     switch (widget.type) {
       case 'TEXT_INPUT':
         return (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Input Type</label>
+          <div className="px-4 py-3 space-y-3">
+            <Field label="Input Type">
               <select
                 value={(widget as any).inputType || 'text'}
                 onChange={(e) => onUpdate({ inputType: e.target.value } as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className={selectClass}
               >
                 <option value="text">Text</option>
                 <option value="email">Email</option>
                 <option value="url">URL</option>
                 <option value="tel">Phone</option>
               </select>
+            </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Min Length">
+                <input type="number" value={(widget as any).minLength || ''} onChange={(e) => onUpdate({ minLength: parseInt(e.target.value) } as any)} className={inputClass} />
+              </Field>
+              <Field label="Max Length">
+                <input type="number" value={(widget as any).maxLength || ''} onChange={(e) => onUpdate({ maxLength: parseInt(e.target.value) } as any)} className={inputClass} />
+              </Field>
             </div>
-
-            <FormInput
-              label="Min Length"
-              type="number"
-              value={(widget as any).minLength || ''}
-              onChange={(e) => onUpdate({ minLength: parseInt(e.target.value) } as any)}
-            />
-
-            <FormInput
-              label="Max Length"
-              type="number"
-              value={(widget as any).maxLength || ''}
-              onChange={(e) => onUpdate({ maxLength: parseInt(e.target.value) } as any)}
-            />
           </div>
         );
 
       case 'QUESTION':
         return (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Render Mode</label>
+          <div className="px-4 py-3 space-y-3">
+            <Field label="Render Mode" hint="How questions are displayed to annotators">
               <select
                 value={(widget as any).renderMode || 'paginated'}
                 onChange={(e) => onUpdate({ renderMode: e.target.value } as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className={selectClass}
               >
-                <option value="paginated">Paginated (One question at a time)</option>
-                <option value="all">All Questions</option>
+                <option value="paginated">Paginated</option>
+                <option value="all">All at once</option>
               </select>
-              <p className="text-xs text-gray-500 mt-1">
-                {(widget as any).renderMode === 'paginated' 
-                  ? 'Users navigate through questions one at a time with Next/Previous buttons'
-                  : 'All questions from project configuration displayed at once'}
-              </p>
-            </div>
+            </Field>
 
             {(widget as any).renderMode === 'paginated' && (
-              <>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={(widget as any).showProgress !== false}
-                    onChange={(e) => onUpdate({ showProgress: e.target.checked } as any)}
-                    className="mr-2"
-                  />
-                  <span className="text-sm text-gray-700">Show progress (e.g., "Question 2 of 5")</span>
+              <div className="space-y-2">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input type="checkbox" checked={(widget as any).showProgress !== false} onChange={(e) => onUpdate({ showProgress: e.target.checked } as any)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+                  <span className="text-[11px] text-slate-600">Show progress indicator</span>
                 </label>
-
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={(widget as any).showNavigation !== false}
-                    onChange={(e) => onUpdate({ showNavigation: e.target.checked } as any)}
-                    className="mr-2"
-                  />
-                  <span className="text-sm text-gray-700">Show Next/Previous buttons</span>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input type="checkbox" checked={(widget as any).showNavigation !== false} onChange={(e) => onUpdate({ showNavigation: e.target.checked } as any)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+                  <span className="text-[11px] text-slate-600">Show navigation buttons</span>
                 </label>
-              </>
+              </div>
             )}
 
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-start gap-2">
-                <span className="text-blue-600">ℹ️</span>
-                <div className="text-xs text-gray-700">
-                  <strong>Note:</strong> This widget automatically renders questions from the project configuration. 
-                  Questions are pulled from the "annotationQuestions" field in the project settings.
-                </div>
-              </div>
+            <div className="p-2.5 bg-indigo-50/60 border border-indigo-100 rounded-lg">
+              <p className="text-[10px] text-slate-600 leading-relaxed">
+                <strong className="text-indigo-600">Note:</strong> Questions are pulled from the project's annotationQuestions configuration.
+              </p>
             </div>
           </div>
         );
 
       case 'TEXTAREA':
         return (
-          <div className="space-y-4">
-            <FormInput
-              label="Rows"
-              type="number"
-              value={(widget as any).rows || 4}
-              onChange={(e) => onUpdate({ rows: parseInt(e.target.value) } as any)}
-              min={2}
-              max={20}
-            />
-
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={(widget as any).showCharCount || false}
-                onChange={(e) => onUpdate({ showCharCount: e.target.checked } as any)}
-                className="mr-2"
-              />
-              <span className="text-sm text-gray-700">Show character count</span>
+          <div className="px-4 py-3 space-y-3">
+            <Field label="Rows">
+              <input type="number" value={(widget as any).rows || 4} onChange={(e) => onUpdate({ rows: parseInt(e.target.value) } as any)} min={2} max={20} className={inputClass} />
+            </Field>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" checked={(widget as any).showCharCount || false} onChange={(e) => onUpdate({ showCharCount: e.target.checked } as any)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+              <span className="text-[11px] text-slate-600">Show character count</span>
             </label>
           </div>
         );
@@ -223,135 +241,91 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({ widget, onUpdate, 
       case 'SELECT':
       case 'MULTI_SELECT':
       case 'RADIO_GROUP':
-        return <OptionsEditor widget={widget} onUpdate={onUpdate} />;
+        return (
+          <div className="px-4 py-3">
+            <OptionsEditor widget={widget} onUpdate={onUpdate} />
+          </div>
+        );
 
       case 'RATING':
         return (
-          <div className="space-y-4">
-            <FormInput
-              label="Max Rating"
-              type="number"
-              value={(widget as any).maxRating || 5}
-              onChange={(e) => onUpdate({ maxRating: parseInt(e.target.value) } as any)}
-              min={3}
-              max={10}
-            />
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Icon</label>
-              <select
-                value={(widget as any).icon || 'star'}
-                onChange={(e) => onUpdate({ icon: e.target.value } as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-              >
+          <div className="px-4 py-3 space-y-3">
+            <Field label="Max Rating">
+              <input type="number" value={(widget as any).maxRating || 5} onChange={(e) => onUpdate({ maxRating: parseInt(e.target.value) } as any)} min={3} max={10} className={inputClass} />
+            </Field>
+            <Field label="Icon">
+              <select value={(widget as any).icon || 'star'} onChange={(e) => onUpdate({ icon: e.target.value } as any)} className={selectClass}>
                 <option value="star">Star</option>
                 <option value="heart">Heart</option>
                 <option value="thumb">Thumb</option>
                 <option value="emoji">Emoji</option>
               </select>
-            </div>
-
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={(widget as any).allowHalf || false}
-                onChange={(e) => onUpdate({ allowHalf: e.target.checked } as any)}
-                className="mr-2"
-              />
-              <span className="text-sm text-gray-700">Allow half ratings</span>
+            </Field>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" checked={(widget as any).allowHalf || false} onChange={(e) => onUpdate({ allowHalf: e.target.checked } as any)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+              <span className="text-[11px] text-slate-600">Allow half ratings</span>
             </label>
           </div>
         );
 
       case 'SLIDER':
         return (
-          <div className="space-y-4">
-            <FormInput
-              label="Minimum Value"
-              type="number"
-              value={(widget as any).min || 0}
-              onChange={(e) => onUpdate({ min: parseInt(e.target.value) } as any)}
-            />
-
-            <FormInput
-              label="Maximum Value"
-              type="number"
-              value={(widget as any).max || 100}
-              onChange={(e) => onUpdate({ max: parseInt(e.target.value) } as any)}
-            />
-
-            <FormInput
-              label="Step"
-              type="number"
-              value={(widget as any).step || 1}
-              onChange={(e) => onUpdate({ step: parseInt(e.target.value) } as any)}
-            />
-
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={(widget as any).showValue || false}
-                onChange={(e) => onUpdate({ showValue: e.target.checked } as any)}
-                className="mr-2"
-              />
-              <span className="text-sm text-gray-700">Show current value</span>
+          <div className="px-4 py-3 space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              <Field label="Min">
+                <input type="number" value={(widget as any).min || 0} onChange={(e) => onUpdate({ min: parseInt(e.target.value) } as any)} className={inputClass} />
+              </Field>
+              <Field label="Max">
+                <input type="number" value={(widget as any).max || 100} onChange={(e) => onUpdate({ max: parseInt(e.target.value) } as any)} className={inputClass} />
+              </Field>
+              <Field label="Step">
+                <input type="number" value={(widget as any).step || 1} onChange={(e) => onUpdate({ step: parseInt(e.target.value) } as any)} className={inputClass} />
+              </Field>
+            </div>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" checked={(widget as any).showValue || false} onChange={(e) => onUpdate({ showValue: e.target.checked } as any)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+              <span className="text-[11px] text-slate-600">Show current value</span>
             </label>
           </div>
         );
 
       case 'INSTRUCTION_TEXT':
         return (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
+          <div className="px-4 py-3 space-y-3">
+            <Field label="Content">
               <textarea
                 value={(widget as any).content || ''}
                 onChange={(e) => onUpdate({ content: e.target.value } as any)}
                 rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
-                placeholder="Enter instruction text..."
+                placeholder="Enter instruction text…"
+                className={inputClass + ' resize-none font-mono'}
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Format</label>
-              <select
-                value={(widget as any).format || 'text'}
-                onChange={(e) => onUpdate({ format: e.target.value } as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-              >
-                <option value="text">Plain Text</option>
-                <option value="markdown">Markdown</option>
-                <option value="html">HTML</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Variant</label>
-              <select
-                value={(widget as any).variant || 'info'}
-                onChange={(e) => onUpdate({ variant: e.target.value } as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-              >
-                <option value="info">Info</option>
-                <option value="warning">Warning</option>
-                <option value="success">Success</option>
-                <option value="error">Error</option>
-              </select>
+            </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Format">
+                <select value={(widget as any).format || 'text'} onChange={(e) => onUpdate({ format: e.target.value } as any)} className={selectClass}>
+                  <option value="text">Plain Text</option>
+                  <option value="markdown">Markdown</option>
+                  <option value="html">HTML</option>
+                </select>
+              </Field>
+              <Field label="Variant">
+                <select value={(widget as any).variant || 'info'} onChange={(e) => onUpdate({ variant: e.target.value } as any)} className={selectClass}>
+                  <option value="info">Info</option>
+                  <option value="warning">Warning</option>
+                  <option value="success">Success</option>
+                  <option value="error">Error</option>
+                </select>
+              </Field>
             </div>
           </div>
         );
 
       case 'FILE_VIEWER':
         return (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">File Type</label>
-              <select
-                value={(widget as any).fileType || 'TEXT'}
-                onChange={(e) => onUpdate({ fileType: e.target.value } as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-              >
+          <div className="px-4 py-3 space-y-3">
+            <Field label="File Type">
+              <select value={(widget as any).fileType || 'TEXT'} onChange={(e) => onUpdate({ fileType: e.target.value } as any)} className={selectClass}>
                 <option value="TEXT">Text</option>
                 <option value="MARKDOWN">Markdown</option>
                 <option value="HTML">HTML</option>
@@ -361,26 +335,14 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({ widget, onUpdate, 
                 <option value="CSV">CSV</option>
                 <option value="PDF">PDF</option>
               </select>
-            </div>
-
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={(widget as any).allowFullscreen || false}
-                onChange={(e) => onUpdate({ allowFullscreen: e.target.checked } as any)}
-                className="mr-2"
-              />
-              <span className="text-sm text-gray-700">Allow fullscreen</span>
+            </Field>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" checked={(widget as any).allowFullscreen || false} onChange={(e) => onUpdate({ allowFullscreen: e.target.checked } as any)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+              <span className="text-[11px] text-slate-600">Allow fullscreen</span>
             </label>
-
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={(widget as any).showControls || false}
-                onChange={(e) => onUpdate({ showControls: e.target.checked } as any)}
-                className="mr-2"
-              />
-              <span className="text-sm text-gray-700">Show controls</span>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" checked={(widget as any).showControls || false} onChange={(e) => onUpdate({ showControls: e.target.checked } as any)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+              <span className="text-[11px] text-slate-600">Show controls</span>
             </label>
           </div>
         );
@@ -390,102 +352,91 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({ widget, onUpdate, 
     }
   };
 
+  /* ── Position & size ─────────────────────────────────────────────────── */
   const renderPositionAndSize = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <FormInput
-          label="X Position"
-          type="number"
-          value={widget.position.x}
-          onChange={(e) =>
-            onUpdate({ position: { ...widget.position, x: parseInt(e.target.value) || 0 } })
-          }
-        />
-
-        <FormInput
-          label="Y Position"
-          type="number"
-          value={widget.position.y}
-          onChange={(e) =>
-            onUpdate({ position: { ...widget.position, y: parseInt(e.target.value) || 0 } })
-          }
-        />
+    <div className="px-4 py-3 space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="X">
+          <input type="number" value={widget.position.x} onChange={(e) => onUpdate({ position: { ...widget.position, x: parseInt(e.target.value) || 0 } })} className={inputClass} />
+        </Field>
+        <Field label="Y">
+          <input type="number" value={widget.position.y} onChange={(e) => onUpdate({ position: { ...widget.position, y: parseInt(e.target.value) || 0 } })} className={inputClass} />
+        </Field>
       </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <FormInput
-          label="Width"
-          type="number"
-          value={widget.size.width}
-          onChange={(e) =>
-            onUpdate({ size: { ...widget.size, width: parseInt(e.target.value) || 100 } })
-          }
-          min={100}
-        />
-
-        <FormInput
-          label="Height"
-          type="number"
-          value={widget.size.height}
-          onChange={(e) =>
-            onUpdate({ size: { ...widget.size, height: parseInt(e.target.value) || 40 } })
-          }
-          min={40}
-        />
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Width">
+          <input type="number" value={widget.size.width} onChange={(e) => onUpdate({ size: { ...widget.size, width: parseInt(e.target.value) || 100 } })} min={100} className={inputClass} />
+        </Field>
+        <Field label="Height">
+          <input type="number" value={widget.size.height} onChange={(e) => onUpdate({ size: { ...widget.size, height: parseInt(e.target.value) || 40 } })} min={40} className={inputClass} />
+        </Field>
       </div>
-
-      <FormInput
-        label="Display Order"
-        type="number"
-        value={widget.order}
-        onChange={(e) => onUpdate({ order: parseInt(e.target.value) || 0 })}
-        helperText="Lower numbers appear first"
-      />
+      <Field label="Display Order" hint="Lower numbers appear first">
+        <input type="number" value={widget.order} onChange={(e) => onUpdate({ order: parseInt(e.target.value) || 0 })} className={inputClass} />
+      </Field>
     </div>
   );
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">{widget.type}</h2>
-        <p className="text-sm text-gray-500 mt-1">ID: {widget.id.substring(0, 12)}...</p>
+      <div className="px-4 py-3 border-b border-slate-100 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold bg-indigo-50 text-indigo-600 rounded-md">
+            {widget.type.replace(/_/g, ' ')}
+          </span>
+        </div>
+        <p className="text-[10px] text-slate-400 mt-1 truncate">ID: {widget.id.substring(0, 16)}…</p>
       </div>
 
-      {/* Properties */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto">
         {/* Basic Properties */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Basic Properties</h3>
-          {renderBasicProperties()}
-        </div>
+        <SectionHeader
+          title="Properties"
+          icon={<Settings2 size={11} />}
+          open={openSections.basic}
+          onToggle={() => toggle('basic')}
+        />
+        {openSections.basic && renderBasicProperties()}
 
-        {/* Type-Specific Properties */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Type-Specific Settings</h3>
-          {renderTypeSpecificProperties()}
-        </div>
+        {/* Type-Specific */}
+        <SectionHeader
+          title="Type Settings"
+          icon={<Sliders size={11} />}
+          open={openSections.type}
+          onToggle={() => toggle('type')}
+        />
+        {openSections.type && renderTypeSpecificProperties()}
 
-        {/* Position and Size */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Position & Size</h3>
-          {renderPositionAndSize()}
-        </div>
+        {/* Position & Size */}
+        <SectionHeader
+          title="Position & Size"
+          icon={<Move size={11} />}
+          open={openSections.position}
+          onToggle={() => toggle('position')}
+        />
+        {openSections.position && renderPositionAndSize()}
       </div>
 
-      {/* Actions */}
-      <div className="p-4 border-t border-gray-200 bg-gray-50">
-        <Button onClick={onDelete} variant="danger" className="w-full">
-          <Trash2 size={16} className="mr-2" />
+      {/* Delete */}
+      <div className="px-4 py-3 border-t border-slate-100 flex-shrink-0">
+        <button
+          onClick={onDelete}
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100
+                     border border-red-200 rounded-lg transition-colors"
+        >
+          <Trash2 size={13} />
           Delete Widget
-        </Button>
+        </button>
       </div>
     </div>
   );
 };
 
-// Options Editor Component for SELECT, MULTI_SELECT, RADIO_GROUP
-const OptionsEditor: React.FC<{ widget: Widget; onUpdate: (updates: Partial<Widget>) => void }> = ({
+/* ── Options Editor (SELECT / MULTI_SELECT / RADIO_GROUP) ─────────────────── */
+
+const OptionsEditor: React.FC<{ widget: Widget; onUpdate: (u: Partial<Widget>) => void }> = ({
   widget,
   onUpdate,
 }) => {
@@ -507,54 +458,52 @@ const OptionsEditor: React.FC<{ widget: Widget; onUpdate: (updates: Partial<Widg
   };
 
   const deleteOption = (index: number) => {
-    const newOptions = options.filter((_: any, i: number) => i !== index);
-    onUpdate({ options: newOptions } as any);
+    onUpdate({ options: options.filter((_: any, i: number) => i !== index) } as any);
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-gray-700">Options</label>
+        <span className="text-[11px] font-medium text-slate-600">Options</span>
         <button
           onClick={addOption}
-          className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+          className="flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-700 font-medium"
         >
-          <Plus size={16} />
-          Add Option
+          <Plus size={12} /> Add
         </button>
       </div>
 
-      <div className="space-y-2 max-h-64 overflow-y-auto">
+      <div className="space-y-1.5 max-h-52 overflow-y-auto">
         {options.map((option: WidgetOption, index: number) => (
-          <div key={option.id} className="flex items-start gap-2 p-2 bg-gray-50 rounded border border-gray-200">
-            <div className="flex-1 space-y-2">
+          <div key={option.id} className="flex items-center gap-1.5 p-1.5 bg-slate-50 rounded-lg border border-slate-100">
+            <div className="flex-1 space-y-1">
               <input
                 type="text"
                 value={option.label}
                 onChange={(e) => updateOption(index, { label: e.target.value })}
                 placeholder="Label"
-                className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                className="w-full px-2 py-1 text-[11px] border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
               />
               <input
                 type="text"
                 value={option.value}
                 onChange={(e) => updateOption(index, { value: e.target.value })}
                 placeholder="Value"
-                className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                className="w-full px-2 py-1 text-[11px] border border-slate-200 rounded bg-white text-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-400"
               />
             </div>
             <button
               onClick={() => deleteOption(index)}
-              className="p-1 text-red-600 hover:bg-red-50 rounded"
+              className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
             >
-              <X size={16} />
+              <X size={13} />
             </button>
           </div>
         ))}
       </div>
 
       {options.length === 0 && (
-        <p className="text-sm text-gray-500 text-center py-4">No options yet. Click "Add Option" to create one.</p>
+        <p className="text-[10px] text-slate-400 text-center py-3">No options yet. Click "Add" above.</p>
       )}
     </div>
   );

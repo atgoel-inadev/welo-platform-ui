@@ -1,11 +1,15 @@
 /**
  * UI Builder Main Component
- * Drag-and-drop interface for building dynamic annotation UIs
+ * Enterprise-grade drag-and-drop interface for building annotation UIs
  */
 
 import { useState, useReducer, useCallback } from 'react';
-import { Save, Eye, Undo, Redo, Code, Download, Upload, LayoutTemplate } from 'lucide-react';
-import { Button } from '../common';
+import {
+  Save, Eye, Undo, Redo, Code, Download, Upload,
+  LayoutTemplate, ArrowLeft, Check, AlertTriangle,
+  PanelRightClose, List, SplitSquareVertical,
+  Columns2, Columns3, LayoutGrid, AlignVerticalSpaceAround, AlignHorizontalSpaceAround,
+} from 'lucide-react';
 import { UIConfiguration, UIBuilderState, UIBuilderAction, PipelineMode, Widget, UITemplate } from '../../types/uiBuilder';
 import { WidgetToolbox } from './WidgetToolbox.tsx';
 import { CanvasArea } from './CanvasArea.tsx';
@@ -15,20 +19,22 @@ import { uiTemplates } from './templates';
 
 interface UIBuilderProps {
   projectId: string;
+  projectName?: string;
+  projectFileType?: string;
   initialConfiguration?: UIConfiguration;
   onSave: (configuration: UIConfiguration) => Promise<void>;
   onCancel?: () => void;
 }
 
 // Build default initial configuration
-function buildDefaultConfig(projectId: string): UIConfiguration {
+function buildDefaultConfig(projectId: string, fileType?: string): UIConfiguration {
   return {
     id: `ui-config-${Date.now()}`,
-    name: 'New UI Configuration',
+    name: 'Annotation Interface',
     version: 1,
     projectId,
     pipelineMode: 'ANNOTATION',
-    fileType: 'TEXT',
+    fileType: (fileType as any) || 'TEXT',
     responseType: 'STRUCTURED',
     layout: {
       type: 'flex-vertical',
@@ -37,6 +43,7 @@ function buildDefaultConfig(projectId: string): UIConfiguration {
       maxWidth: 800,
     },
     widgets: [],
+    renderMode: 'paginated',
   };
 }
 
@@ -47,11 +54,7 @@ function normalizeWidgetOrders(config: UIConfiguration): UIConfiguration {
     ...widget,
     order: index,
   }));
-  
-  return {
-    ...config,
-    widgets: normalizedWidgets,
-  };
+  return { ...config, widgets: normalizedWidgets };
 }
 
 // Reducer for UI Builder state management
@@ -239,6 +242,8 @@ function uiBuilderReducer(state: UIBuilderState, action: UIBuilderAction): UIBui
 
 export const UIBuilder: React.FC<UIBuilderProps> = ({
   projectId,
+  projectName,
+  projectFileType,
   initialConfiguration,
   onSave,
   onCancel,
@@ -248,12 +253,33 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
   const [showTemplates, setShowTemplates] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const defaultConfig = buildDefaultConfig(projectId);
-  
-  // Normalize initial configuration to ensure widget orders are sequential
-  const normalizedInitialConfig = initialConfiguration 
-    ? normalizeWidgetOrders(initialConfiguration)
+  const defaultConfig = buildDefaultConfig(projectId, projectFileType);
+
+  // If we got an initial config, merge with defaults and apply projectFileType override
+  const normalizedInitialConfig = initialConfiguration
+    ? normalizeWidgetOrders({
+        ...defaultConfig,
+        ...initialConfiguration,
+        fileType: (projectFileType as any) || initialConfiguration.fileType || defaultConfig.fileType,
+        layout: initialConfiguration.layout && typeof initialConfiguration.layout === 'object'
+          ? initialConfiguration.layout
+          : defaultConfig.layout,
+        widgets: (initialConfiguration.widgets || []).map((w: any, i: number) => ({
+          ...w,
+          order: w.order ?? i,
+          required: w.required ?? false,
+          hidden: w.hidden ?? false,
+          sizePreset: w.sizePreset || 'medium',
+          // Normalize string options to { id, label, value } objects
+          options: Array.isArray(w.options)
+            ? w.options.map((o: any) =>
+                typeof o === 'string' ? { id: o, label: o, value: o } : o,
+              )
+            : w.options,
+        })),
+      })
     : defaultConfig;
 
   const initialState: UIBuilderState = {
@@ -273,13 +299,17 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
     try {
       setSaveError(null);
       setSaveSuccess(false);
+      setSaving(true);
       await onSave(state.configuration);
       dispatch({ type: 'LOAD_CONFIGURATION', configuration: state.configuration });
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      setTimeout(() => setSaveSuccess(false), 2500);
     } catch (error: any) {
       console.error('Failed to save UI configuration:', error);
       setSaveError(error?.message || 'Failed to save configuration');
+      setTimeout(() => setSaveError(null), 4000);
+    } finally {
+      setSaving(false);
     }
   }, [state.configuration, onSave]);
 
@@ -308,7 +338,6 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
       };
       reader.readAsText(file);
     }
-    // Reset input so the same file can be imported again
     event.target.value = '';
   }, []);
 
@@ -319,232 +348,317 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
 
   const canUndo = state.historyIndex > 0;
   const canRedo = state.historyIndex < state.history.length - 1;
-  // Allow saving if dirty OR if there are widgets (new config with content)
   const canSave = state.isDirty || state.configuration.widgets.length > 0;
 
+  /* Layout icons map for toolbar */
+  const layoutOptions: { value: string; label: string; icon: React.ReactNode }[] = [
+    { value: 'flex-vertical', label: 'Vertical', icon: <AlignVerticalSpaceAround size={14} /> },
+    { value: 'flex-horizontal', label: 'Horizontal', icon: <AlignHorizontalSpaceAround size={14} /> },
+    { value: 'grid', label: 'Grid', icon: <LayoutGrid size={14} /> },
+    { value: 'two-column', label: '2 Col', icon: <Columns2 size={14} /> },
+    { value: 'three-column', label: '3 Col', icon: <Columns3 size={14} /> },
+  ];
+
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      {/* Toolbar */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-bold text-gray-900">UI Builder</h1>
-          <div className="flex items-center gap-2 pl-4 border-l">
-            <Button
-              onClick={() => dispatch({ type: 'UNDO' })}
-              disabled={!canUndo}
-              variant="secondary"
-              size="sm"
-              title="Undo"
-            >
-              <Undo size={16} />
-            </Button>
-            <Button
-              onClick={() => dispatch({ type: 'REDO' })}
-              disabled={!canRedo}
-              variant="secondary"
-              size="sm"
-              title="Redo"
-            >
-              <Redo size={16} />
-            </Button>
+    <div className="flex flex-col h-full bg-slate-50">
+      {/* ─── Top Toolbar ──────────────────────────────────────────────────── */}
+      <div className="bg-white border-b border-slate-200/80 flex-shrink-0">
+        {/* Primary row */}
+        <div className="h-14 px-4 flex items-center justify-between">
+          {/* Left: Back + Title */}
+          <div className="flex items-center gap-3 min-w-0">
+            {onCancel && (
+              <button
+                onClick={onCancel}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <ArrowLeft size={18} />
+              </button>
+            )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  defaultValue={state.configuration.name}
+                  key={state.configuration.id}
+                  onBlur={(e) => {
+                    if (e.target.value !== state.configuration.name) {
+                      dispatch({ type: 'UPDATE_CONFIG_METADATA', updates: { name: e.target.value } });
+                    }
+                  }}
+                  className="text-sm font-semibold text-slate-800 bg-transparent border-0 border-b border-transparent
+                             hover:border-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-0
+                             px-1 py-0.5 w-52 truncate transition-colors"
+                  placeholder="Configuration name…"
+                />
+                {state.isDirty && (
+                  <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400" title="Unsaved changes" />
+                )}
+              </div>
+              {projectName && (
+                <p className="text-[11px] text-slate-400 pl-1 truncate">
+                  {projectName} · {projectFileType || state.configuration.fileType}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Config name editor */}
-          <input
-            type="text"
-            defaultValue={state.configuration.name}
-            key={state.configuration.id}
-            onBlur={(e) => {
-              if (e.target.value !== state.configuration.name) {
-                dispatch({ type: 'UPDATE_CONFIG_METADATA', updates: { name: e.target.value } });
+          {/* Center: Undo/Redo + Layout */}
+          <div className="flex items-center gap-1">
+            {/* Undo/Redo */}
+            <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden mr-2">
+              <button
+                onClick={() => dispatch({ type: 'UNDO' })}
+                disabled={!canUndo}
+                className="p-2 text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Undo"
+              >
+                <Undo size={15} />
+              </button>
+              <div className="w-px h-5 bg-slate-200" />
+              <button
+                onClick={() => dispatch({ type: 'REDO' })}
+                disabled={!canRedo}
+                className="p-2 text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Redo"
+              >
+                <Redo size={15} />
+              </button>
+            </div>
+
+            {/* Layout selector */}
+            <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden">
+              {layoutOptions.map((lo) => (
+                <button
+                  key={lo.value}
+                  onClick={() =>
+                    dispatch({
+                      type: 'UPDATE_CONFIG_METADATA',
+                      updates: { layout: { ...state.configuration.layout, type: lo.value as any } },
+                    })
+                  }
+                  className={`p-2 transition-colors ${
+                    state.configuration.layout.type === lo.value
+                      ? 'bg-indigo-50 text-indigo-600'
+                      : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+                  }`}
+                  title={lo.label}
+                >
+                  {lo.icon}
+                </button>
+              ))}
+            </div>
+
+            {/* Render mode toggle: Paginated vs All */}
+            <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden ml-2">
+              <button
+                onClick={() =>
+                  dispatch({
+                    type: 'UPDATE_CONFIG_METADATA',
+                    updates: { renderMode: 'paginated' },
+                  })
+                }
+                className={`p-2 transition-colors ${
+                  (state.configuration.renderMode || 'paginated') === 'paginated'
+                    ? 'bg-indigo-50 text-indigo-600'
+                    : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+                }`}
+                title="Paginated (one question at a time)"
+              >
+                <SplitSquareVertical size={14} />
+              </button>
+              <div className="w-px h-5 bg-slate-200" />
+              <button
+                onClick={() =>
+                  dispatch({
+                    type: 'UPDATE_CONFIG_METADATA',
+                    updates: { renderMode: 'all' },
+                  })
+                }
+                className={`p-2 transition-colors ${
+                  state.configuration.renderMode === 'all'
+                    ? 'bg-indigo-50 text-indigo-600'
+                    : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+                }`}
+                title="All questions (scrollable)"
+              >
+                <List size={14} />
+              </button>
+            </div>
+          </div>
+
+          {/* Right: Actions */}
+          <div className="flex items-center gap-1.5">
+            {/* Mode selector */}
+            <select
+              value={state.previewMode}
+              onChange={(e) =>
+                dispatch({ type: 'SET_PREVIEW_MODE', mode: e.target.value as PipelineMode })
               }
-            }}
-            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
-            placeholder="Configuration name..."
-          />
+              className="h-8 pl-2.5 pr-7 text-xs font-medium border border-slate-200 rounded-lg bg-white text-slate-600
+                         focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 appearance-none
+                         bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg%20xmlns%3d%22http%3a%2f%2fwww.w3.org%2f2000%2fsvg%22%20width%3d%2212%22%20height%3d%2212%22%20viewBox%3d%220%200%2024%2024%22%20fill%3d%22none%22%20stroke%3d%22%239ca3af%22%20stroke-width%3d%222%22%3e%3cpath%20d%3d%22m6%209%206%206%206-6%22%3e%3c%2fpath%3e%3c%2fsvg%3e')] bg-no-repeat bg-[right_6px_center]"
+            >
+              <option value="ANNOTATION">Annotation</option>
+              <option value="REVIEW">Review</option>
+              <option value="QUALITY_CHECK">QA</option>
+            </select>
 
-          {/* File type */}
-          <select
-            value={state.configuration.fileType}
-            onChange={(e) =>
-              dispatch({ type: 'UPDATE_CONFIG_METADATA', updates: { fileType: e.target.value as any } })
-            }
-            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-          >
-            <option value="TEXT">Text</option>
-            <option value="MARKDOWN">Markdown</option>
-            <option value="IMAGE">Image</option>
-            <option value="AUDIO">Audio</option>
-            <option value="VIDEO">Video</option>
-            <option value="CSV">CSV</option>
-            <option value="PDF">PDF</option>
-          </select>
+            <div className="w-px h-5 bg-slate-200 mx-1" />
 
-          {/* Layout type */}
-          <select
-            value={state.configuration.layout.type}
-            onChange={(e) =>
-              dispatch({ 
-                type: 'UPDATE_CONFIG_METADATA', 
-                updates: { 
-                  layout: { 
-                    ...state.configuration.layout, 
-                    type: e.target.value as any 
-                  } 
-                } 
-              })
-            }
-            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-            title="Layout Type"
-          >
-            <option value="flex-vertical">Vertical (Stacked)</option>
-            <option value="flex-horizontal">Horizontal (Wrapped)</option>
-            <option value="grid">Grid</option>
-            <option value="two-column">Two Columns</option>
-            <option value="three-column">Three Columns</option>
-          </select>
+            {/* Templates */}
+            <button
+              onClick={() => setShowTemplates(!showTemplates)}
+              className="h-8 px-2.5 flex items-center gap-1.5 text-xs font-medium border border-slate-200 rounded-lg
+                         text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              <LayoutTemplate size={14} />
+              <span className="hidden xl:inline">Templates</span>
+            </button>
 
-          {/* Preview mode */}
-          <select
-            value={state.previewMode}
-            onChange={(e) =>
-              dispatch({ type: 'SET_PREVIEW_MODE', mode: e.target.value as PipelineMode })
-            }
-            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-          >
-            <option value="ANNOTATION">Annotation Mode</option>
-            <option value="REVIEW">Review Mode</option>
-            <option value="QUALITY_CHECK">Quality Check Mode</option>
-          </select>
+            {/* Preview toggle */}
+            <button
+              onClick={() => { setShowPreview(!showPreview); setShowCodeView(false); }}
+              className={`h-8 px-2.5 flex items-center gap-1.5 text-xs font-medium border rounded-lg transition-colors ${
+                showPreview
+                  ? 'bg-indigo-50 border-indigo-200 text-indigo-600'
+                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {showPreview ? <PanelRightClose size={14} /> : <Eye size={14} />}
+              <span className="hidden xl:inline">{showPreview ? 'Close' : 'Preview'}</span>
+            </button>
 
-          <Button
-            onClick={() => setShowTemplates(!showTemplates)}
-            variant="secondary"
-            size="sm"
-          >
-            <LayoutTemplate size={16} className="mr-1" />
-            Templates
-          </Button>
+            {/* JSON toggle */}
+            <button
+              onClick={() => { setShowCodeView(!showCodeView); setShowPreview(false); }}
+              className={`h-8 px-2.5 flex items-center gap-1.5 text-xs font-medium border rounded-lg transition-colors ${
+                showCodeView
+                  ? 'bg-indigo-50 border-indigo-200 text-indigo-600'
+                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Code size={14} />
+              <span className="hidden xl:inline">JSON</span>
+            </button>
 
-          <Button
-            onClick={() => { setShowPreview(!showPreview); setShowCodeView(false); }}
-            variant={showPreview ? 'primary' : 'secondary'}
-            size="sm"
-          >
-            <Eye size={16} className="mr-1" />
-            {showPreview ? 'Hide' : 'Preview'}
-          </Button>
+            <div className="w-px h-5 bg-slate-200 mx-1" />
 
-          <Button
-            onClick={() => { setShowCodeView(!showCodeView); setShowPreview(false); }}
-            variant={showCodeView ? 'primary' : 'secondary'}
-            size="sm"
-          >
-            <Code size={16} className="mr-1" />
-            JSON
-          </Button>
-
-          <div className="border-l pl-2 ml-2 flex gap-2">
+            {/* Import */}
             <label className="cursor-pointer">
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleImport}
-                className="hidden"
-              />
-              <span className="inline-flex items-center px-3 py-1.5 text-sm font-medium border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer text-gray-700">
-                <Upload size={16} className="mr-1" />
-                Import
+              <input type="file" accept=".json" onChange={handleImport} className="hidden" />
+              <span className="inline-flex items-center h-8 px-2.5 text-xs font-medium border border-slate-200 rounded-lg
+                               text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer gap-1.5">
+                <Upload size={14} />
+                <span className="hidden xl:inline">Import</span>
               </span>
             </label>
 
-            <Button onClick={handleExport} variant="secondary" size="sm">
-              <Download size={16} className="mr-1" />
-              Export
-            </Button>
-          </div>
-
-          <div className="border-l pl-2 ml-2 flex gap-2">
-            {onCancel && (
-              <Button onClick={onCancel} variant="secondary">
-                Cancel
-              </Button>
-            )}
-            <Button
-              onClick={handleSave}
-              variant="primary"
-              disabled={!canSave}
+            {/* Export */}
+            <button
+              onClick={handleExport}
+              className="h-8 px-2.5 flex items-center gap-1.5 text-xs font-medium border border-slate-200 rounded-lg
+                         text-slate-600 hover:bg-slate-50 transition-colors"
             >
-              <Save size={16} className="mr-1" />
-              Save
-            </Button>
+              <Download size={14} />
+              <span className="hidden xl:inline">Export</span>
+            </button>
+
+            <div className="w-px h-5 bg-slate-200 mx-1" />
+
+            {/* Save */}
+            <button
+              onClick={handleSave}
+              disabled={!canSave || saving}
+              className="h-8 px-4 flex items-center gap-1.5 text-xs font-semibold rounded-lg transition-all
+                         bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800
+                         disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-indigo-200"
+            >
+              {saving ? (
+                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : saveSuccess ? (
+                <Check size={14} />
+              ) : (
+                <Save size={14} />
+              )}
+              {saveSuccess ? 'Saved' : 'Save'}
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Save feedback */}
+      {/* ─── Save feedback toasts ─────────────────────────────────────────── */}
       {saveError && (
-        <div className="mx-4 mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex-shrink-0">
-          Save failed: {saveError}
-        </div>
-      )}
-      {saveSuccess && (
-        <div className="mx-4 mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-700 flex-shrink-0">
-          Configuration saved successfully!
+        <div className="mx-4 mt-2 flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex-shrink-0">
+          <AlertTriangle size={14} className="text-red-500 flex-shrink-0" />
+          <span className="truncate">Save failed: {saveError}</span>
         </div>
       )}
 
-      {/* Templates Overlay */}
+      {/* ─── Templates modal ──────────────────────────────────────────────── */}
       {showTemplates && (
-        <div className="absolute inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center" onClick={() => setShowTemplates(false)}>
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Choose a Template</h2>
-              <button onClick={() => setShowTemplates(false)} className="text-gray-400 hover:text-gray-600 text-2xl font-bold">×</button>
+        <div
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowTemplates(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[75vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">Templates</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Choose a template to quickly scaffold your UI</p>
+              </div>
+              <button
+                onClick={() => setShowTemplates(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                ×
+              </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {uiTemplates.map((template) => (
-                <button
-                  key={template.id}
-                  onClick={() => handleLoadTemplate(template)}
-                  className="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all group"
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${getCategoryColor(template.category)}`}>
-                      {getCategoryEmoji(template.category)}
+            <div className="overflow-y-auto p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {uiTemplates.map((template) => (
+                  <button
+                    key={template.id}
+                    onClick={() => handleLoadTemplate(template)}
+                    className="text-left p-4 bg-slate-50 border border-slate-200 rounded-xl hover:border-indigo-300
+                               hover:bg-indigo-50/40 hover:shadow-md transition-all group"
+                  >
+                    <div className="flex items-center gap-2.5 mb-2">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-base ${getCategoryColor(template.category)}`}>
+                        {getCategoryEmoji(template.category)}
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-800 group-hover:text-indigo-700">{template.name}</h3>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider">{template.category}</span>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 group-hover:text-blue-600">{template.name}</h3>
-                      <span className="text-xs text-gray-500 capitalize">{template.category}</span>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-600">{template.description}</p>
-                  <div className="mt-3 text-xs text-gray-400">
-                    {template.configuration.widgets.length} widgets
-                  </div>
-                </button>
-              ))}
+                    <p className="text-xs text-slate-500 line-clamp-2 mb-2">{template.description}</p>
+                    <span className="text-[10px] text-slate-400">{template.configuration.widgets.length} widgets</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Main Content */}
+      {/* ─── Main Content ─────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel - Widget Toolbox */}
-        <div className="w-64 bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0">
+        <div className="w-[260px] bg-white border-r border-slate-200/80 overflow-y-auto flex-shrink-0">
           <WidgetToolbox
             onAddWidget={(widget: Widget) => dispatch({ type: 'ADD_WIDGET', widget })}
           />
         </div>
 
-        {/* Center - Canvas Area */}
-        <div className="flex-1 overflow-auto p-4">
+        {/* Center - Canvas */}
+        <div className="flex-1 overflow-auto">
           {showCodeView ? (
-            <div className="h-full bg-gray-900 rounded-lg p-4">
-              <pre className="text-green-400 text-sm font-mono overflow-auto h-full">
+            <div className="h-full bg-[#0f172a] p-5">
+              <pre className="text-emerald-400 text-xs font-mono leading-relaxed overflow-auto h-full">
                 {JSON.stringify(state.configuration, null, 2)}
               </pre>
             </div>
@@ -569,7 +683,7 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
 
         {/* Right Panel - Properties or Preview */}
         {showPreview ? (
-          <div className="w-[480px] bg-white border-l border-gray-200 overflow-y-auto flex-shrink-0">
+          <div className="w-[440px] bg-white border-l border-slate-200/80 overflow-y-auto flex-shrink-0">
             <PreviewPanel
               configuration={state.configuration}
               pipelineMode={state.previewMode}
@@ -577,7 +691,7 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
           </div>
         ) : (
           state.selectedWidget && (
-            <div className="w-96 bg-white border-l border-gray-200 overflow-y-auto flex-shrink-0">
+            <div className="w-[340px] bg-white border-l border-slate-200/80 overflow-y-auto flex-shrink-0">
               <PropertyPanel
                 widget={state.selectedWidget}
                 onUpdate={(updates: Partial<Widget>) =>
@@ -596,20 +710,31 @@ export const UIBuilder: React.FC<UIBuilderProps> = ({
         )}
       </div>
 
-      {/* Status Bar */}
-      <div className="bg-gray-100 border-t border-gray-200 px-4 py-2 flex items-center justify-between text-sm text-gray-600 flex-shrink-0">
+      {/* ─── Status Bar ───────────────────────────────────────────────────── */}
+      <div className="h-7 bg-white border-t border-slate-200/80 px-4 flex items-center justify-between text-[11px] text-slate-500 flex-shrink-0 select-none">
         <div className="flex items-center gap-4">
-          <span>Widgets: {state.configuration.widgets.length}</span>
-          <span>Layout: {state.configuration.layout.type}</span>
-          <span>File Type: {state.configuration.fileType}</span>
-          <span>Mode: {state.previewMode}</span>
+          <span>{state.configuration.widgets.length} widget{state.configuration.widgets.length !== 1 ? 's' : ''}</span>
+          <span className="text-slate-300">·</span>
+          <span className="capitalize">{state.configuration.layout.type.replace(/-/g, ' ')}</span>
+          <span className="text-slate-300">·</span>
+          <span>{state.configuration.fileType}</span>
+          <span className="text-slate-300">·</span>
+          <span>{state.previewMode}</span>
         </div>
-        <div className="flex items-center gap-4">
-          {state.isDirty && <span className="text-orange-600 font-medium">● Unsaved changes</span>}
-          {!state.isDirty && state.configuration.widgets.length > 0 && (
-            <span className="text-green-600">✓ Saved</span>
+        <div className="flex items-center gap-3">
+          {state.isDirty && (
+            <span className="flex items-center gap-1 text-amber-600">
+              <span className="w-1 h-1 rounded-full bg-amber-500" />
+              Unsaved
+            </span>
           )}
-          <span>Version: {state.configuration.version}</span>
+          {!state.isDirty && state.configuration.widgets.length > 0 && (
+            <span className="flex items-center gap-1 text-emerald-600">
+              <Check size={10} />
+              Up to date
+            </span>
+          )}
+          <span className="text-slate-400">v{state.configuration.version}</span>
         </div>
       </div>
     </div>

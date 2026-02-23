@@ -1,5 +1,7 @@
+import { useEffect, useRef } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAppSelector } from '../hooks/useRedux';
+import { useAppSelector, useAppDispatch } from '../hooks/useRedux';
+import { checkSession } from '../store/authSlice';
 import { UserRole } from '../services/authService';
 
 interface RoleBasedRouteProps {
@@ -19,6 +21,16 @@ export const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
 }) => {
   const { user, isAuthenticated, initialCheckDone } = useAppSelector((state) => state.auth);
   const location = useLocation();
+  const dispatch = useAppDispatch();
+  const sessionCheckDispatched = useRef(false);
+
+  // Dispatch checkSession if it hasn't been done yet (e.g., on page refresh)
+  useEffect(() => {
+    if (!initialCheckDone && !sessionCheckDispatched.current) {
+      sessionCheckDispatched.current = true;
+      dispatch(checkSession());
+    }
+  }, [initialCheckDone, dispatch]);
 
   // Wait for initial auth check
   if (!initialCheckDone) {
@@ -64,6 +76,16 @@ export const PermissionBasedRoute: React.FC<PermissionBasedRouteProps> = ({
 }) => {
   const { user, isAuthenticated, initialCheckDone } = useAppSelector((state) => state.auth);
   const location = useLocation();
+  const dispatch = useAppDispatch();
+  const sessionCheckDispatched = useRef(false);
+
+  // Dispatch checkSession if it hasn't been done yet (e.g., on page refresh)
+  useEffect(() => {
+    if (!initialCheckDone && !sessionCheckDispatched.current) {
+      sessionCheckDispatched.current = true;
+      dispatch(checkSession());
+    }
+  }, [initialCheckDone, dispatch]);
 
   // Wait for initial auth check
   if (!initialCheckDone) {

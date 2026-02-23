@@ -547,6 +547,9 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
   const isCurrentAnswered = currentQuestion ? answeredQuestions.has(currentQuestion.id) : false;
   const canProceed = !currentQuestion?.required || isCurrentAnswered;
 
+  // Derive render mode from UI configuration
+  const renderMode: 'paginated' | 'all' = (config?.uiConfiguration as any)?.renderMode || 'paginated';
+
   const handleNext = () => {
     if (currentQuestion) runPluginsForQuestion(currentQuestion.id);
     if (!isLast) setCurrentQuestionIdx((i) => i + 1);
@@ -860,7 +863,7 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
                   <p className="text-xs mt-1">This task has no questions to answer.</p>
                 </div>
               </div>
-            ) : (
+            ) : renderMode === 'paginated' ? (
               <>
                 {/* Progress bar + question dots */}
                 <div className="bg-white border-b border-gray-200 px-6 py-3 flex-shrink-0">
@@ -1089,6 +1092,81 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
                       Next <ChevronRight size={18} />
                     </button>
                   )}
+                </div>
+              </>
+            ) : (
+              /* ── All-at-once mode ── */
+              <>
+                {/* Progress summary */}
+                <div className="bg-white border-b border-gray-200 px-6 py-3 flex-shrink-0">
+                  <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
+                    <span className="font-medium">All Questions</span>
+                    <span>{answeredQuestions.size}/{questions.length} answered</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div
+                      className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${questions.length > 0 ? (answeredQuestions.size / questions.length) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Instructions (if any) */}
+                {instructions.length > 0 && (
+                  <div className="px-6 pt-4 flex-shrink-0">
+                    {instructions.map((item) => (
+                      <InstructionBanner key={item.id} item={item} />
+                    ))}
+                  </div>
+                )}
+
+                {/* All question cards */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                  {questions.map((q, i) => {
+                    const qValue = formData[q.id];
+                    const ps = questionPluginState[q.id];
+                    return (
+                      <div key={q.id} className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                        <div className="mb-5">
+                          <div className="flex items-start gap-2 mb-1">
+                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex-shrink-0 mt-0.5">
+                              {i + 1}
+                            </span>
+                            <h3 className="text-base font-semibold text-gray-900 leading-snug">
+                              {q.text}
+                              {q.required !== false && <span className="text-red-500 ml-1">*</span>}
+                            </h3>
+                          </div>
+                          {q.description && (
+                            <p className="text-sm text-gray-500 mt-1.5 ml-8">{q.description}</p>
+                          )}
+                        </div>
+                        <div className="ml-8">
+                          <QuestionWidget
+                            question={q}
+                            value={qValue}
+                            onChange={(v) => handleQuestionResponse(q.id, v)}
+                            disabled={ps?.status === 'running'}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Submit footer */}
+                <div className="bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-end flex-shrink-0">
+                  <button
+                    onClick={handleSubmitAnnotation}
+                    disabled={submitting}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-60 transition shadow-sm"
+                  >
+                    {submitting ? (
+                      <><Loader2 className="animate-spin" size={16} /> Submitting...</>
+                    ) : (
+                      <><Send size={16} /> Submit Annotation</>
+                    )}
+                  </button>
                 </div>
               </>
             )}
