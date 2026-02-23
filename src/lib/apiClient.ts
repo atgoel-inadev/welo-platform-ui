@@ -138,11 +138,11 @@ class ApiClient {
 }
 
 // Service URLs from environment or defaults
-const PROJECT_MANAGEMENT_URL = import.meta.env.VITE_PROJECT_MANAGEMENT_URL || 'http://localhost:3004/api/v1';
-const TASK_MANAGEMENT_URL = import.meta.env.VITE_TASK_MANAGEMENT_URL || 'http://localhost:3003/api/v1';
-const WORKFLOW_ENGINE_URL = import.meta.env.VITE_WORKFLOW_ENGINE_URL || 'http://localhost:3001/api/v1';
-const AUTH_SERVICE_URL = import.meta.env.VITE_AUTH_SERVICE_URL || 'http://localhost:3002/api/v1';
-const ANNOTATION_QA_URL = import.meta.env.VITE_ANNOTATION_QA_URL || 'http://localhost:3005/api/v1';
+const PROJECT_MANAGEMENT_URL = import.meta.env.VITE_PROJECT_MANAGEMENT_URL || 'http://localhost:4004/api/v1';
+const TASK_MANAGEMENT_URL = import.meta.env.VITE_TASK_MANAGEMENT_URL || 'http://localhost:4003/api/v1';
+const WORKFLOW_ENGINE_URL = import.meta.env.VITE_WORKFLOW_ENGINE_URL || 'http://localhost:4001/api/v1';
+const AUTH_SERVICE_URL = import.meta.env.VITE_AUTH_SERVICE_URL || 'http://localhost:4002/api/v1';
+const ANNOTATION_QA_URL = import.meta.env.VITE_ANNOTATION_QA_URL || 'http://localhost:4005/api/v1';
 
 // Create API client instances for each service
 export const projectManagementApi = new ApiClient(PROJECT_MANAGEMENT_URL);
