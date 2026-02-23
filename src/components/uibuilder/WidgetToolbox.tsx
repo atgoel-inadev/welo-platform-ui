@@ -1,6 +1,6 @@
 /**
  * Widget Toolbox Component
- * Displays available widgets that can be dragged onto the canvas
+ * Clean, categorised widget library with click-to-add
  */
 
 import { useState } from 'react';
@@ -21,6 +21,9 @@ import {
   Type,
   List,
   HelpCircle,
+  Search,
+  X,
+  Plus,
 } from 'lucide-react';
 import { Widget, WidgetDefinition } from '../../types/uiBuilder';
 
@@ -45,7 +48,7 @@ const widgetDefinitions: WidgetDefinition[] = [
   {
     type: 'QUESTION',
     name: 'Question Widget',
-    description: 'Dynamically renders questions from project configuration',
+    description: 'Renders questions from project config',
     icon: 'HelpCircle',
     category: 'input',
     defaultConfig: {
@@ -61,7 +64,7 @@ const widgetDefinitions: WidgetDefinition[] = [
   {
     type: 'TEXT_INPUT',
     name: 'Text Input',
-    description: 'Single-line text input',
+    description: 'Single-line text field',
     icon: 'Type',
     category: 'input',
     defaultConfig: {
@@ -74,7 +77,7 @@ const widgetDefinitions: WidgetDefinition[] = [
   {
     type: 'TEXTAREA',
     name: 'Text Area',
-    description: 'Multi-line text input',
+    description: 'Multi-line text field',
     icon: 'AlignLeft',
     category: 'input',
     defaultConfig: {
@@ -102,7 +105,7 @@ const widgetDefinitions: WidgetDefinition[] = [
   {
     type: 'MULTI_SELECT',
     name: 'Multi Select',
-    description: 'Multiple selection dropdown',
+    description: 'Multiple selection checkboxes',
     icon: 'CheckSquare',
     category: 'input',
     defaultConfig: {
@@ -131,7 +134,7 @@ const widgetDefinitions: WidgetDefinition[] = [
   {
     type: 'CHECKBOX',
     name: 'Checkbox',
-    description: 'Single checkbox',
+    description: 'Single checkbox toggle',
     icon: 'CheckSquare',
     category: 'input',
     defaultConfig: {
@@ -144,7 +147,7 @@ const widgetDefinitions: WidgetDefinition[] = [
   {
     type: 'RATING',
     name: 'Rating',
-    description: 'Star rating input',
+    description: 'Star-based rating input',
     icon: 'Star',
     category: 'input',
     defaultConfig: {
@@ -159,7 +162,7 @@ const widgetDefinitions: WidgetDefinition[] = [
   {
     type: 'SLIDER',
     name: 'Slider',
-    description: 'Numeric slider input',
+    description: 'Numeric range slider',
     icon: 'Sliders',
     category: 'input',
     defaultConfig: {
@@ -175,7 +178,7 @@ const widgetDefinitions: WidgetDefinition[] = [
   {
     type: 'DATE_PICKER',
     name: 'Date Picker',
-    description: 'Date/time selection',
+    description: 'Date / time selection',
     icon: 'Calendar',
     category: 'input',
     defaultConfig: {
@@ -188,7 +191,7 @@ const widgetDefinitions: WidgetDefinition[] = [
   {
     type: 'INSTRUCTION_TEXT',
     name: 'Instructions',
-    description: 'Instruction or info text',
+    description: 'Informational text block',
     icon: 'Info',
     category: 'display',
     defaultConfig: {
@@ -202,7 +205,7 @@ const widgetDefinitions: WidgetDefinition[] = [
   {
     type: 'DIVIDER',
     name: 'Divider',
-    description: 'Visual separator line',
+    description: 'Horizontal separator',
     icon: 'Minus',
     category: 'layout',
     defaultConfig: {
@@ -214,7 +217,7 @@ const widgetDefinitions: WidgetDefinition[] = [
   {
     type: 'SPACER',
     name: 'Spacer',
-    description: 'Empty space',
+    description: 'Vertical spacing',
     icon: 'Box',
     category: 'layout',
     defaultConfig: {
@@ -240,39 +243,37 @@ const widgetDefinitions: WidgetDefinition[] = [
 ];
 
 const iconComponents: Record<string, any> = {
-  FileText,
-  Image,
-  Video,
-  Music,
-  CheckSquare,
-  Circle,
-  AlignLeft,
-  Star,
-  Sliders,
-  Calendar,
-  Info,
-  Minus,
-  Box,
-  Type,
-  List,
-  HelpCircle,
+  FileText, Image, Video, Music, CheckSquare, Circle, AlignLeft,
+  Star, Sliders, Calendar, Info, Minus, Box, Type, List, HelpCircle,
+};
+
+const categoryMeta: Record<string, { label: string; color: string }> = {
+  media: { label: 'Media', color: 'text-violet-600 bg-violet-50' },
+  input: { label: 'Input', color: 'text-blue-600 bg-blue-50' },
+  display: { label: 'Display', color: 'text-amber-600 bg-amber-50' },
+  layout: { label: 'Layout', color: 'text-emerald-600 bg-emerald-50' },
 };
 
 export const WidgetToolbox: React.FC<WidgetToolboxProps> = ({ onAddWidget }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [search, setSearch] = useState('');
 
   const categories = [
-    { id: 'all', name: 'All Widgets' },
-    { id: 'media', name: 'Media' },
-    { id: 'input', name: 'Input' },
-    { id: 'display', name: 'Display' },
-    { id: 'layout', name: 'Layout' },
+    { id: 'all', label: 'All' },
+    { id: 'media', label: 'Media' },
+    { id: 'input', label: 'Input' },
+    { id: 'display', label: 'Display' },
+    { id: 'layout', label: 'Layout' },
   ];
 
-  const filteredWidgets =
-    selectedCategory === 'all'
-      ? widgetDefinitions
-      : widgetDefinitions.filter((w) => w.category === selectedCategory);
+  const filtered = widgetDefinitions.filter((w) => {
+    const matchCategory = selectedCategory === 'all' || w.category === selectedCategory;
+    const matchSearch =
+      !search ||
+      w.name.toLowerCase().includes(search.toLowerCase()) ||
+      w.description.toLowerCase().includes(search.toLowerCase());
+    return matchCategory && matchSearch;
+  });
 
   const handleAddWidget = (definition: WidgetDefinition) => {
     const newWidget: Widget = {
@@ -285,65 +286,94 @@ export const WidgetToolbox: React.FC<WidgetToolboxProps> = ({ onAddWidget }) => 
       order: 0,
       ...(definition.defaultConfig as any),
     };
-
     onAddWidget(newWidget);
   };
 
   return (
     <div className="flex flex-col h-full">
-      {/* Category Filter */}
-      <div className="p-4 border-b border-gray-200">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">Widget Library</h2>
-        <div className="flex flex-col gap-1">
-          {categories.map((category) => (
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3 flex-shrink-0">
+        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Widgets</h2>
+
+        {/* Search */}
+        <div className="relative mb-3">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search widgets…"
+            className="w-full pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg
+                       placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all"
+          />
+          {search && (
             <button
-              key={category.id}
-              onClick={() => setSelectedCategory(category.id)}
-              className={`px-3 py-2 text-sm text-left rounded-md transition-colors ${
-                selectedCategory === category.id
-                  ? 'bg-blue-50 text-blue-700 font-medium'
-                  : 'text-gray-600 hover:bg-gray-50'
+              onClick={() => setSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+
+        {/* Category pills */}
+        <div className="flex flex-wrap gap-1">
+          {categories.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setSelectedCategory(c.id)}
+              className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
+                selectedCategory === c.id
+                  ? 'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200'
+                  : 'text-slate-500 hover:bg-slate-50'
               }`}
             >
-              {category.name}
+              {c.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Widget List */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="space-y-2">
-          {filteredWidgets.map((widget) => {
+      {/* Widget list */}
+      <div className="flex-1 overflow-y-auto px-3 pb-3">
+        <div className="space-y-1">
+          {filtered.map((widget) => {
             const IconComponent = iconComponents[widget.icon] || FileText;
+            const cat = categoryMeta[widget.category] || { label: widget.category, color: 'text-slate-500 bg-slate-50' };
             return (
               <button
                 key={widget.type}
                 onClick={() => handleAddWidget(widget)}
-                className="w-full p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all cursor-pointer text-left group"
+                className="w-full px-3 py-2.5 rounded-lg border border-transparent hover:border-slate-200 hover:bg-slate-50
+                           transition-all text-left group flex items-center gap-3"
                 title={widget.description}
               >
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-gray-50 rounded-md group-hover:bg-blue-50 transition-colors">
-                    <IconComponent size={20} className="text-gray-600 group-hover:text-blue-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-gray-900 group-hover:text-blue-700">
-                      {widget.name}
-                    </h3>
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{widget.description}</p>
-                  </div>
+                <div className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 transition-colors ${cat.color}`}>
+                  <IconComponent size={14} />
                 </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-slate-700 group-hover:text-slate-900 truncate">{widget.name}</p>
+                  <p className="text-[10px] text-slate-400 truncate">{widget.description}</p>
+                </div>
+                <Plus
+                  size={14}
+                  className="text-slate-300 group-hover:text-indigo-500 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all"
+                />
               </button>
             );
           })}
+          {filtered.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-xs text-slate-400">No widgets match your search.</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Instructions */}
-      <div className="p-4 border-t border-gray-200 bg-gray-50">
-        <p className="text-xs text-gray-600">
-          <strong>Tip:</strong> Click a widget to add it to the canvas. Configure its properties in the right panel.
+      {/* Footer tip */}
+      <div className="px-4 py-2.5 border-t border-slate-100 flex-shrink-0">
+        <p className="text-[10px] text-slate-400 leading-relaxed">
+          Click a widget to add it to the canvas. Configure properties in the right panel.
         </p>
       </div>
     </div>
