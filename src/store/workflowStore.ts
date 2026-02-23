@@ -147,7 +147,7 @@ export const useWorkflowStore = create<WorkflowState>()(
           projectId ? { projectId } : undefined
         );
 
-        set({ workflows, isLoading: false });
+        set({ workflows: workflows ?? [], isLoading: false });
       } catch (error) {
         set({ error: (error as Error).message, isLoading: false });
       }
