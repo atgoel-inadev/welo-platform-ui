@@ -216,6 +216,15 @@ export const BatchDetails = () => {
   };
 
   const unassignedCount = tasks.filter((t) => !t.assignedTo).length;
+  
+  // Compute assignment counts by user from tasks
+  const assignmentCountsByUser = tasks.reduce((acc, task) => {
+    if (task.assignedTo) {
+      acc[task.assignedTo] = (acc[task.assignedTo] || 0) + 1;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+  
   const filteredTasks = getFilteredTasks();
 
   if (loading) {
@@ -320,7 +329,7 @@ export const BatchDetails = () => {
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div
                 className="bg-green-500 h-2 rounded-full"
-                style={{ width: `${statistics.completionRate}%` }}
+                style={{ width: `${statistics.completionPercentage}%` }}
               ></div>
             </div>
           </div>
@@ -373,17 +382,17 @@ export const BatchDetails = () => {
 
           <div className="flex-1 text-sm text-gray-600">
             <p>
-              <strong>{Object.keys(statistics.assignmentCounts).length}</strong> annotators assigned
+              <strong>{Object.keys(assignmentCountsByUser).length}</strong> annotators assigned
             </p>
           </div>
         </div>
 
         {/* Assignment Distribution */}
-        {Object.keys(statistics.assignmentCounts).length > 0 && (
+        {Object.keys(assignmentCountsByUser).length > 0 && (
           <div className="mt-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Assignment Distribution</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {Object.entries(statistics.assignmentCounts).map(([userId, count]) => (
+              {Object.entries(assignmentCountsByUser).map(([userId, count]) => (
                 <div key={userId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center">
                     <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm mr-3">
@@ -476,6 +485,9 @@ export const BatchDetails = () => {
                   Assigned To
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Stage
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Priority
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -486,7 +498,7 @@ export const BatchDetails = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredTasks.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
+                  <td colSpan={6} className="px-6 py-12 text-center">
                     <AlertCircle className="w-12 h-12 mx-auto text-gray-400 mb-3" />
                     <p className="text-gray-600">No tasks found</p>
                   </td>
@@ -516,6 +528,17 @@ export const BatchDetails = () => {
                       ) : (
                         <span className="text-sm text-gray-500">Unassigned</span>
                       )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        task.workflowStage === 'REVIEW'
+                          ? 'bg-purple-100 text-purple-800'
+                          : task.workflowStage === 'ANNOTATION'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {task.workflowStage || 'N/A'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm text-gray-900">{task.priority}</span>

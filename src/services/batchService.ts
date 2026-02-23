@@ -50,10 +50,14 @@ export interface BatchStatistics {
   inProgressTasks: number;
   queuedTasks: number;
   failedTasks: number;
-  assignmentCounts: Record<string, number>;
+  assignmentBreakdown: {
+    manual: number;
+    autoAssigned: number;
+    unassigned: number;
+  };
   qualityScore?: number;
   averageTaskDuration?: number;
-  completionRate: number;
+  completionPercentage: number;
 }
 
 export interface Task {
@@ -66,6 +70,7 @@ export interface Task {
   fileName: string;
   status: string;
   assignedTo?: string;
+  workflowStage?: string;
   priority: number;
   createdAt: string;
   updatedAt: string;
@@ -132,17 +137,17 @@ class BatchService {
    * Get tasks for a batch (from task-management service)
    */
   async getBatchTasks(batchId: string): Promise<Task[]> {
-    return taskManagementApi.get<Task[]>('/tasks', {
+    const response = await taskManagementApi.get<{ tasks: Task[] }>('/tasks', {
       params: { batchId },
     });
+    return response.tasks;
   }
 
   /**
    * Manual task assignment
    */
-  async assignTask(taskId: string, userId: string, workflowStage: string = 'annotation'): Promise<Task> {
-    return projectManagementApi.post<Task>('/batches/assign-task', {
-      taskId,
+  async assignTask(taskId: string, userId: string, workflowStage: string = 'ANNOTATION'): Promise<Task> {
+    return taskManagementApi.post<Task>(`/tasks/${taskId}/assign`, {
       userId,
       workflowStage,
     });
@@ -164,9 +169,8 @@ class BatchService {
   /**
    * Reassign a task to a different user
    */
-  async reassignTask(taskId: string, newUserId: string): Promise<Task> {
-    return projectManagementApi.post<Task>('/batches/reassign-task', {
-      taskId,
+  async reassignTask(taskId: string, newUserId: string): Promise<{ task: Task; assignment: any }> {
+    return taskManagementApi.post<{ task: Task; assignment: any }>(`/tasks/${taskId}/reassign`, {
       newUserId,
     });
   }
@@ -175,7 +179,7 @@ class BatchService {
    * Unassign a task
    */
   async unassignTask(taskId: string): Promise<Task> {
-    return projectManagementApi.post<Task>('/batches/unassign-task', { taskId });
+    return taskManagementApi.post<Task>(`/tasks/${taskId}/unassign`, {});
   }
 }
 

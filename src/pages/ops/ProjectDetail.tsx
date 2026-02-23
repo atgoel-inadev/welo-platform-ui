@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Edit, Briefcase, Users, CheckCircle, Clock,
-  FileText, Settings, BarChart3, PlayCircle, Upload,
+  FileText, Settings, BarChart3, PlayCircle, Upload, ListTodo,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks/useRedux';
 import { fetchProjectById, fetchProjectStatistics } from '../../store/projectsSlice';
@@ -350,6 +350,11 @@ export const ProjectDetail = () => {
             <h2 className="text-xl font-semibold text-gray-900">Quick Actions</h2>
           </div>
           <div className="p-6 flex flex-wrap gap-3">
+            <Link to={`/ops/projects/${id}/tasks`}>
+              <Button variant="primary" icon={ListTodo}>
+                View All Tasks
+              </Button>
+            </Link>
             <Link to={`/ops/projects/${id}/edit`}>
               <Button variant="secondary" icon={Edit}>
                 Edit Project
@@ -366,7 +371,7 @@ export const ProjectDetail = () => {
               </Button>
             </Link>
             <Link to={`/ops/projects/${id}/demo`}>
-              <Button variant="primary" icon={PlayCircle}>
+              <Button variant="secondary" icon={PlayCircle}>
                 Demo Workflow
               </Button>
             </Link>

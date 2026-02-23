@@ -200,6 +200,28 @@ export interface TimeAnalytics {
   taskMetrics: TaskTimeMetric[];
 }
 
+export interface TaskComment {
+  id: string;
+  entityType: string;
+  entityId: string;
+  userId: string;
+  parentCommentId: string | null;
+  content: string;
+  isResolved: boolean;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+  };
+  replies?: TaskComment[];
+}
+
 export interface ConsensusData {
   taskId: string;
   totalAnnotations: number;
@@ -479,6 +501,69 @@ export class TaskService {
       { params: query }
     );
     return response;
+  }
+
+  // ─── PM: Task Listing with full filters ──────────────────────────────────
+
+  async listTasksForPM(filter: TaskFilterDto): Promise<{ tasks: Task[]; total: number; page: number; pageSize: number }> {
+    const params: Record<string, string | number> = {};
+    if (filter.projectId) params.projectId = filter.projectId;
+    if (filter.batchId) params.batchId = filter.batchId;
+    if (filter.status) params.status = filter.status;
+    if (filter.assignedTo) params.assignedTo = filter.assignedTo;
+    if (filter.taskType) params.taskType = filter.taskType;
+    if (filter.page) params.page = filter.page;
+    if (filter.pageSize) params.pageSize = filter.pageSize;
+    if (filter.sortBy) params.sortBy = filter.sortBy;
+    if (filter.sortOrder) params.sortOrder = filter.sortOrder;
+    const response = await taskManagementApi.get<{ tasks: Task[]; total: number; page: number; pageSize: number }>(
+      '/tasks',
+      { params },
+    );
+    return response;
+  }
+
+  // ─── PM: Reassign task ────────────────────────────────────────────────────
+
+  async reassignTask(
+    taskId: string,
+    newUserId: string,
+    reason?: string,
+    workflowStage?: string,
+  ): Promise<{ task: Task; assignment: Assignment }> {
+    const response = await taskManagementApi.post<{ task: Task; assignment: Assignment }>(
+      `/tasks/${taskId}/reassign`,
+      { newUserId, reason, workflowStage },
+    );
+    return response;
+  }
+
+  // ─── PM: Task Comments ────────────────────────────────────────────────────
+
+  async getTaskComments(taskId: string): Promise<TaskComment[]> {
+    const response = await taskManagementApi.get<TaskComment[]>(`/tasks/${taskId}/comments`);
+    return Array.isArray(response) ? response : [];
+  }
+
+  async addTaskComment(taskId: string, content: string, userId: string, parentCommentId?: string): Promise<TaskComment> {
+    const response = await taskManagementApi.post<TaskComment>(`/tasks/${taskId}/comments`, {
+      userId,
+      content,
+      parentCommentId,
+    });
+    return response;
+  }
+
+  async resolveTaskComment(taskId: string, commentId: string, resolvedBy: string): Promise<TaskComment> {
+    const response = await taskManagementApi.patch<TaskComment>(
+      `/tasks/${taskId}/comments/${commentId}/resolve`,
+      { resolvedBy },
+    );
+    return response;
+  }
+
+  async deleteTaskComment(taskId: string, commentId: string, userId: string): Promise<void> {
+    await taskManagementApi.delete(`/tasks/${taskId}/comments/${commentId}?userId=${userId}`);
   }
 }
 
