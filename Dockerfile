@@ -13,14 +13,14 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build-time env vars — point to nginx gateway on host port 8080
-# These get baked into the JS bundle at build time
-ARG VITE_AUTH_SERVICE_URL=http://localhost:8080/auth/api/v1
-ARG VITE_TASK_MANAGEMENT_URL=http://localhost:8080/tasks/api/v1
-ARG VITE_PROJECT_MANAGEMENT_URL=http://localhost:8080/projects/api/v1
-ARG VITE_WORKFLOW_ENGINE_URL=http://localhost:8080/workflows/api/v1
-ARG VITE_ANNOTATION_QA_URL=http://localhost:8080/annotation-qa/api/v1
-ARG VITE_API_URL=http://localhost:8080/projects/api/v1
+# Build-time env vars — baked into the JS bundle at build time
+# Values are passed from docker-compose.yml which reads from .env
+ARG VITE_AUTH_SERVICE_URL
+ARG VITE_TASK_MANAGEMENT_URL
+ARG VITE_PROJECT_MANAGEMENT_URL
+ARG VITE_WORKFLOW_ENGINE_URL
+ARG VITE_ANNOTATION_QA_URL
+ARG VITE_API_URL
 
 # Build
 RUN npm run build

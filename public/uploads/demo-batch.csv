@@ -1,7 +1,7 @@
 file_name,file_type,file_url,external_id
-sample_image1.jpg,IMAGE,http://localhost:3004/api/v1/media/sample_image1.jpg,img_001
-sample_image2.jpg,IMAGE,http://localhost:3004/api/v1/media/sample_image2.jpg,img_002
-sample_image3.jpg,IMAGE,http://localhost:3004/api/v1/media/sample_image3.jpg,img_003
-sample_text1.txt,TEXT,http://localhost:3004/api/v1/media/sample_text1.txt,txt_001
-sample_text2.txt,TEXT,http://localhost:3004/api/v1/media/sample_text2.txt,txt_002
-sample_data.csv,CSV,http://localhost:3004/api/v1/media/sample_data.csv,csv_001
+sample_image1.jpg,IMAGE,/api/v1/media/sample_image1.jpg,img_001
+sample_image2.jpg,IMAGE,/api/v1/media/sample_image2.jpg,img_002
+sample_image3.jpg,IMAGE,/api/v1/media/sample_image3.jpg,img_003
+sample_text1.txt,TEXT,/api/v1/media/sample_text1.txt,txt_001
+sample_text2.txt,TEXT,/api/v1/media/sample_text2.txt,txt_002
+sample_data.csv,CSV,/api/v1/media/sample_data.csv,csv_001

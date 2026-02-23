@@ -137,7 +137,7 @@ export const BatchUpload = () => {
       
       // For demo, we'll use the file name and construct the URL
       // The file should be manually placed in public/uploads or use a file input workaround
-      const backendUrl = `http://localhost:4004/api/v1/media/${file.name}`;
+      const backendUrl = `${import.meta.env.VITE_PROJECT_MANAGEMENT_URL}/media/${file.name}`;
       
       // Store file in browser's temporary storage (for demo simulation)
       const reader = new FileReader();
@@ -151,7 +151,7 @@ export const BatchUpload = () => {
       });
     } catch (error) {
       console.error('Error copying file:', error);
-      return `http://localhost:4004/api/v1/media/${file.name}`;
+      return `${import.meta.env.VITE_PROJECT_MANAGEMENT_URL}/media/${file.name}`;
     }
   };
 
@@ -478,9 +478,9 @@ export const BatchUpload = () => {
             <h4 className="font-semibold text-sm mb-2">Sample CSV Format:</h4>
             <pre className="text-xs text-gray-700 overflow-x-auto">
 {`file_name,file_type,file_url,external_id
-sample_image1.jpg,IMAGE,http://localhost:4004/api/v1/media/sample_image1.jpg,img_001
-sample_image2.jpg,IMAGE,http://localhost:4004/api/v1/media/sample_image2.jpg,img_002
-sample_text1.txt,TEXT,http://localhost:4004/api/v1/media/sample_text1.txt,txt_001`}
+sample_image1.jpg,IMAGE,<YOUR_API_URL>/media/sample_image1.jpg,img_001
+sample_image2.jpg,IMAGE,<YOUR_API_URL>/media/sample_image2.jpg,img_002
+sample_text1.txt,TEXT,<YOUR_API_URL>/media/sample_text1.txt,txt_001`}
             </pre>
             <p className="text-xs text-gray-600 mt-2">
               <strong>Supported file types:</strong> IMAGE, VIDEO, AUDIO, TEXT, CSV, PDF, JSON
