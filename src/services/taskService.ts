@@ -1,8 +1,48 @@
 import { taskManagementApi } from '../lib/apiClient';
 import { TaskStatus } from '../types';
 
+// ── Import canonical types from single source of truth ───────────────────
+import type {
+  Task,
+  Assignment,
+  AnnotationResponse,
+  TaskStatistics,
+  TaskComment,
+  TaskAnnotation,
+  TaskFilterDto,
+  GetNextTaskDto,
+  SubmitTaskDto,
+  UpdateTaskStatusDto,
+  ReviewSubmitDto,
+  TimeAnalyticsQueryDto,
+  AnnotatorMetric,
+  ReviewerMetric,
+  TaskTimeMetric,
+  TimeAnalytics,
+} from '../types/api.types';
+
+// Re-export so callers that `import { Task } from '../services/taskService'` keep working
+export type {
+  Task,
+  Assignment,
+  AnnotationResponse,
+  TaskStatistics,
+  TaskComment,
+  TaskAnnotation,
+  TaskFilterDto,
+  GetNextTaskDto,
+  SubmitTaskDto,
+  UpdateTaskStatusDto,
+  ReviewSubmitDto,
+  TimeAnalyticsQueryDto,
+  AnnotatorMetric,
+  ReviewerMetric,
+  TaskTimeMetric,
+  TimeAnalytics,
+};
+
 /**
- * Backend API Response Types
+ * Backend API Response Types (service-layer wrappers, not in api.types.ts)
  */
 export interface BackendResponse<T> {
   success: boolean;
@@ -25,180 +65,8 @@ export interface PaginatedResponse<T> {
   limit: number;
 }
 
-/**
- * Task Interfaces
- */
-export interface Task {
-  id: string;
-  batchId: string;
-  projectId: string;
-  workflowId: string;
-  externalId: string;
-  taskType: 'ANNOTATION' | 'REVIEW' | 'VALIDATION';
-  status: TaskStatus;
-  priority: number;
-  dueDate?: string;
-  fileType?: 'CSV' | 'TXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'PDF' | 'JSON' | 'HTML' | 'MARKDOWN';
-  fileUrl?: string;
-  fileName?: string;
-  fileSize?: number;
-  fileMetadata?: any;
-  dataPayload: {
-    sourceData: any;
-    references?: any[];
-    context?: any;
-  };
-  estimatedDuration?: number;
-  actualDuration?: number;
-  requiresConsensus: boolean;
-  totalAssignmentsRequired: number;
-  completedAssignments: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Assignment {
-  id: string;
-  taskId: string;
-  userId: string;
-  workflowStage: string;
-  status: 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'EXPIRED' | 'RELEASED';
-  assignedAt: string;
-  startedAt?: string;
-  completedAt?: string;
-  expiresAt: string;
-  assignmentMethod: 'MANUAL' | 'AUTOMATIC' | 'CLAIMED';
-  task?: Task;
-}
-
-export interface AnnotationResponse {
-  questionId: string;
-  response: any;
-  timeSpent?: number;
-  confidenceScore?: number;
-}
-
-export interface TaskStatistics {
-  taskId: string;
-  totalAnnotations: number;
-  completedAnnotations: number;
-  averageConfidenceScore: number;
-  averageTimeSpent: number;
-  consensusScore?: number;
-  consensusReached: boolean;
-  currentReviewLevel: number;
-  reviewsApproved: number;
-  reviewsRejected: number;
-  qualityScore?: number;
-}
-
-/**
- * DTOs for API requests
- */
-export interface GetNextTaskDto {
-  userId: string;
-  queueId?: string;
-  taskType?: string;
-  projectId?: string;
-}
-
-export interface SubmitTaskDto {
-  assignmentId: string;
-  annotationData: any;
-  confidenceScore?: number;
-  timeSpent?: number;
-  responses?: AnnotationResponse[];
-}
-
-export interface UpdateTaskStatusDto {
-  status: TaskStatus;
-  reason?: string;
-  metadata?: any;
-}
-
-export interface TaskFilterDto {
-  batchId?: string;
-  projectId?: string;
-  status?: TaskStatus;
-  priority?: number;
-  assignedTo?: string;
-  taskType?: string;
-  page?: number;
-  pageSize?: number;
-  sortBy?: string;
-  sortOrder?: 'ASC' | 'DESC';
-}
-
-/**
- * Review-specific interfaces
- */
-export interface TaskAnnotation {
-  id: string;
-  taskId: string;
-  assignmentId: string;
-  userId: string;
-  userName?: string;
-  annotationData: any;
-  responses: AnnotationResponse[];
-  timeSpent: number;
-  confidenceScore?: number;
-  submittedAt: string;
-  reviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_REVISION';
-  reviewFeedback?: string;
-  reviewedBy?: string;
-  reviewedAt?: string;
-}
-
-export interface ReviewSubmitDto {
-  annotationId: string;
-  decision: 'APPROVED' | 'REJECTED' | 'NEEDS_REVISION';
-  feedback?: string;
-  qualityScore?: number;
-  tags?: string[];
-}
-
-export interface TimeAnalyticsQueryDto {
-  projectId?: string;
-  batchId?: string;
-  startDate?: string;
-  endDate?: string;
-  userId?: string;
-}
-
-export interface AnnotatorMetric {
-  userId: string;
-  totalTasks: number;
-  totalTimeSpent: number;
-  averageTimePerTask: number;
-}
-
-export interface ReviewerMetric {
-  userId: string;
-  totalReviews: number;
-  totalTimeSpent: number;
-  averageTimePerReview: number;
-}
-
-export interface TaskTimeMetric {
-  taskId: string;
-  estimatedDuration: number;
-  actualDuration: number;
-  efficiency: number;
-}
-
-export interface TimeAnalytics {
-  summary: {
-    totalAnnotators: number;
-    totalReviewers: number;
-    totalAnnotationTime: number;
-    totalReviewTime: number;
-    averageAnnotationTime: number;
-    averageReviewTime: number;
-  };
-  annotatorMetrics: AnnotatorMetric[];
-  reviewerMetrics: ReviewerMetric[];
-  taskMetrics: TaskTimeMetric[];
-}
+// (Task, Assignment, TaskComment and all other interfaces are now imported
+//  from src/types/api.types.ts above and re-exported.)
 
 export interface ConsensusData {
   taskId: string;
@@ -479,6 +347,69 @@ export class TaskService {
       { params: query }
     );
     return response;
+  }
+
+  // ─── PM: Task Listing with full filters ──────────────────────────────────
+
+  async listTasksForPM(filter: TaskFilterDto): Promise<{ tasks: Task[]; total: number; page: number; pageSize: number }> {
+    const params: Record<string, string | number> = {};
+    if (filter.projectId) params.projectId = filter.projectId;
+    if (filter.batchId) params.batchId = filter.batchId;
+    if (filter.status) params.status = filter.status;
+    if (filter.assignedTo) params.assignedTo = filter.assignedTo;
+    if (filter.taskType) params.taskType = filter.taskType;
+    if (filter.page) params.page = filter.page;
+    if (filter.pageSize) params.pageSize = filter.pageSize;
+    if (filter.sortBy) params.sortBy = filter.sortBy;
+    if (filter.sortOrder) params.sortOrder = filter.sortOrder;
+    const response = await taskManagementApi.get<{ tasks: Task[]; total: number; page: number; pageSize: number }>(
+      '/tasks',
+      { params },
+    );
+    return response;
+  }
+
+  // ─── PM: Reassign task ────────────────────────────────────────────────────
+
+  async reassignTask(
+    taskId: string,
+    newUserId: string,
+    reason?: string,
+    workflowStage?: string,
+  ): Promise<{ task: Task; assignment: Assignment }> {
+    const response = await taskManagementApi.post<{ task: Task; assignment: Assignment }>(
+      `/tasks/${taskId}/reassign`,
+      { newUserId, reason, workflowStage },
+    );
+    return response;
+  }
+
+  // ─── PM: Task Comments ────────────────────────────────────────────────────
+
+  async getTaskComments(taskId: string): Promise<TaskComment[]> {
+    const response = await taskManagementApi.get<TaskComment[]>(`/tasks/${taskId}/comments`);
+    return Array.isArray(response) ? response : [];
+  }
+
+  async addTaskComment(taskId: string, content: string, userId: string, parentCommentId?: string): Promise<TaskComment> {
+    const response = await taskManagementApi.post<TaskComment>(`/tasks/${taskId}/comments`, {
+      userId,
+      content,
+      parentCommentId,
+    });
+    return response;
+  }
+
+  async resolveTaskComment(taskId: string, commentId: string, resolvedBy: string): Promise<TaskComment> {
+    const response = await taskManagementApi.patch<TaskComment>(
+      `/tasks/${taskId}/comments/${commentId}/resolve`,
+      { resolvedBy },
+    );
+    return response;
+  }
+
+  async deleteTaskComment(taskId: string, commentId: string, userId: string): Promise<void> {
+    await taskManagementApi.delete(`/tasks/${taskId}/comments/${commentId}?userId=${userId}`);
   }
 }
 

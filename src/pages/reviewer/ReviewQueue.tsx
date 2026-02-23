@@ -359,7 +359,7 @@ export const ReviewQueue = () => {
                         Task #{task.id.slice(0, 8)}
                       </span>
                       <span className={`px-2 py-1 text-xs font-medium rounded ${
-                        task.status === 'PENDING_REVIEW'
+                        task.status === 'SUBMITTED'
                           ? 'bg-yellow-100 text-yellow-700'
                           : task.status === 'IN_PROGRESS'
                           ? 'bg-blue-100 text-blue-700'

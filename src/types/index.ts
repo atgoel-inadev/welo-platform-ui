@@ -39,15 +39,15 @@ export enum QuestionType {
   MULTI_TURN = 'MULTI_TURN'
 }
 
+/** Matches backend TaskStatus enum exactly — do NOT add values not in the backend */
 export enum TaskStatus {
   QUEUED = 'QUEUED',
   ASSIGNED = 'ASSIGNED',
   IN_PROGRESS = 'IN_PROGRESS',
-  PENDING_REVIEW = 'PENDING_REVIEW',
+  SUBMITTED = 'SUBMITTED',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
-  COMPLETED = 'COMPLETED',
-  SKIPPED = 'SKIPPED'
+  SKIPPED = 'SKIPPED',
 }
 
 export enum FileType {
@@ -215,3 +215,33 @@ export interface ProjectStatistics {
   quality_score: number;
   active_annotators: number;
 }
+
+// ── Re-export canonical backend-aligned types from api.types.ts ──────────
+// Import task/assignment/comment interfaces from here rather than from service files.
+export type {
+  TaskStatusValue,
+  TaskTypeValue,
+  AssignmentStatusValue,
+  AssignmentMethodValue,
+  WorkflowStageValue,
+  FileTypeValue,
+  BatchStatusValue,
+  BackendEnvelope,
+  Task as ApiTask,
+  Assignment as ApiAssignment,
+  TaskComment,
+  TaskStatistics,
+  AnnotationResponse,
+  TaskAnnotation,
+  TaskFilterDto,
+  GetNextTaskDto,
+  SubmitTaskDto,
+  UpdateTaskStatusDto,
+  ReviewSubmitDto,
+  Batch as ApiBatch,
+  TimeAnalyticsQueryDto,
+  AnnotatorMetric,
+  ReviewerMetric,
+  TaskTimeMetric,
+  TimeAnalytics,
+} from './api.types';
