@@ -149,6 +149,26 @@ export const pluginService = {
       payload,
     );
   },
+
+  /** Test a plugin inline without saving — sends the full plugin config to the backend */
+  async testPluginInline(payload: {
+    projectId: string;
+    questionId: string;
+    questionText: string;
+    questionType: string;
+    answerValue: any;
+    plugin: {
+      type: 'API' | 'SCRIPT';
+      onFailBehavior?: string;
+      apiConfig?: any;
+      scriptCode?: string;
+    };
+  }): Promise<PluginExecuteResult> {
+    return taskManagementApi.post<PluginExecuteResult>(
+      '/tasks/plugins/test',
+      payload,
+    );
+  },
 };
 
 export default pluginService;
