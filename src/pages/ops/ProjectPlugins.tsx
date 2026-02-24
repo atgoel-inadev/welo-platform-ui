@@ -70,8 +70,9 @@ export const ProjectPlugins = () => {
     await load();
   };
 
-  const handleSaved = async (_plugin: Plugin) => {
-    setEditorOpen(false);
+  const handleSaved = async (plugin: Plugin) => {
+    // Keep modal open so user can continue to Test tab
+    setEditingPlugin(plugin);
     await load();
   };
 
