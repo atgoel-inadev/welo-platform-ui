@@ -127,9 +127,14 @@ export const FileViewer = ({
     initRenderer();
 
     return () => {
-      if (rendererRef.current) {
-        rendererRef.current.destroy();
-        rendererRef.current = null;
+      try {
+        if (rendererRef.current) {
+          rendererRef.current.destroy();
+          rendererRef.current = null;
+        }
+      } catch (err) {
+        // Silently handle cleanup errors
+        console.warn('Renderer cleanup warning:', err);
       }
     };
   }, [file, fileType, width, height]);

@@ -70,6 +70,7 @@ interface InstructionItem {
 
 // ─── Widget-type helpers ──────────────────────────────────────────────────────
 const QUESTION_WIDGET_TYPES = new Set([
+  'QUESTION', // Generic question widget container
   'TEXT_INPUT', 'TEXTAREA', 'SELECT', 'MULTI_SELECT',
   'RADIO_GROUP', 'CHECKBOX', 'RATING', 'SLIDER', 'DATE_PICKER',
 ]);
@@ -113,7 +114,30 @@ function normalizeLegacyQuestion(q: any): Question {
   const options: QuestionOption[] | undefined = Array.isArray(q.options)
     ? q.options.map((o: any) => typeof o === 'string' ? { label: o, value: o } : { label: o.label || o.value, value: o.value || o.id })
     : undefined;
-  return { ...q, options };
+  
+  // Map API questionType to internal type format
+  const typeMap: Record<string, string> = {
+    'TEXT': 'text',
+    'TEXTAREA': 'textarea',
+    'SINGLE_SELECT': 'single_select',
+    'MULTI_SELECT': 'multi_select',
+    'CHECKBOX': 'checkbox',
+    'RATING': 'rating',
+    'SLIDER': 'slider',
+    'DATE': 'date',
+    'BOOLEAN': 'boolean',
+  };
+  
+  const normalizedType = q.questionType ? typeMap[q.questionType.toUpperCase()] || q.questionType.toLowerCase() : q.type;
+  
+  return {
+    id: q.id,
+    text: q.question || q.text || 'Question',
+    description: q.description,
+    type: normalizedType || 'text',
+    options,
+    required: q.required !== false,
+  };
 }
 
 // ─── Question Widget ──────────────────────────────────────────────────────────
@@ -408,7 +432,9 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
     try {
       setLoading(true);
       setError(null);
+      console.log('[UnifiedTaskRenderer] Loading config for task:', taskId, 'user:', userId);
       const renderConfig = await taskRenderingService.getTaskRenderConfig(taskId, userId);
+      console.log('[UnifiedTaskRenderer] Config loaded:', renderConfig);
       setConfig(renderConfig);
 
       if (renderConfig.annotationResponses?.length) {
@@ -420,6 +446,7 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
         setAnsweredQuestions(new Set(Object.keys(existing)));
       }
     } catch (err: any) {
+      console.error('[UnifiedTaskRenderer] Error loading config:', err);
       setError(err.message || 'Failed to load task configuration');
     } finally {
       setLoading(false);
@@ -428,20 +455,38 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
 
   // ── Derive questions from uiConfiguration.widgets (preferred) or annotationQuestions (fallback) ──
   const questions: Question[] = useMemo(() => {
-    const widgets = config?.uiConfiguration?.widgets;
+    console.log('[UnifiedTaskRenderer] Full config:', config);
+    console.log('[UnifiedTaskRenderer] uiConfiguration:', config?.uiConfiguration);
+    
+    // Handle nested configuration structure
+    const uiConfig = config?.uiConfiguration as any;
+    const widgets = uiConfig?.widgets || uiConfig?.configuration?.widgets;
+    
+    console.log('[UnifiedTaskRenderer] Deriving questions from widgets:', widgets);
     if (Array.isArray(widgets) && widgets.length > 0) {
+      // Check if there's a QUESTION widget - if yes, use annotationQuestions
+      const questionWidget = widgets.find((w: any) => w.type === 'QUESTION' && !w.hidden);
+      console.log('[UnifiedTaskRenderer] Found QUESTION widget:', questionWidget);
+      if (questionWidget && config?.annotationQuestions) {
+        console.log('[UnifiedTaskRenderer] Using annotationQuestions:', config.annotationQuestions);
+        return config.annotationQuestions.map(normalizeLegacyQuestion);
+      }
+      
+      // Otherwise, derive questions from individual question widgets
       return widgets
-        .filter((w: any) => QUESTION_WIDGET_TYPES.has(w.type) && !w.hidden)
+        .filter((w: any) => QUESTION_WIDGET_TYPES.has(w.type) && w.type !== 'QUESTION' && !w.hidden)
         .sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0))
         .map(widgetToQuestion);
     }
     // Fallback to flat annotationQuestions from backend
+    console.log('[UnifiedTaskRenderer] Fallback to annotationQuestions:', config?.annotationQuestions);
     return (config?.annotationQuestions || []).map(normalizeLegacyQuestion);
   }, [config]);
 
   // Instruction text widgets to display in the questions panel
   const instructions: InstructionItem[] = useMemo(() => {
-    const widgets = config?.uiConfiguration?.widgets;
+    const uiConfig = config?.uiConfiguration as any;
+    const widgets = uiConfig?.widgets || uiConfig?.configuration?.widgets;
     if (!Array.isArray(widgets)) return [];
     return widgets
       .filter((w: any) => w.type === 'INSTRUCTION_TEXT' && !w.hidden)
@@ -452,6 +497,32 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
         variant: (w.variant as InstructionItem['variant']) || 'info',
         order: w.order ?? 0,
       }));
+  }, [config]);
+
+  // Derive visible widgets in order (for layout rendering)
+  const visibleWidgets = useMemo(() => {
+    const uiConfig = config?.uiConfiguration as any;
+    const widgets = uiConfig?.widgets || uiConfig?.configuration?.widgets;
+    if (!Array.isArray(widgets)) return [];
+    const visible = widgets
+      .filter((w: any) => !w.hidden)
+      .sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+    console.log('[UnifiedTaskRenderer] Visible widgets:', visible);
+    return visible;
+  }, [config]);
+
+  // Extract layout configuration
+  const layout = useMemo(() => {
+    const uiConfig = config?.uiConfiguration as any;
+    const actualConfig = uiConfig?.configuration || uiConfig;
+    const layoutConfig = {
+      type: actualConfig?.layout?.type || 'flex-horizontal',
+      gap: actualConfig?.layout?.gap || 16,
+      columns: actualConfig?.layout?.columns || 2,
+      maxWidth: actualConfig?.layout?.maxWidth || 1200,
+    };
+    console.log('[UnifiedTaskRenderer] Layout config:', layoutConfig);
+    return layoutConfig;
   }, [config]);
 
   const handleQuestionResponse = useCallback((questionId: string, response: any) => {
@@ -793,10 +864,274 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
 
   const fileUrl = config.taskData?.fileUrls?.[0];
 
+  // ── Widget renderer helper ──
+  const renderWidgetByType = (widget: any) => {
+    switch (widget.type) {
+      case 'FILE_VIEWER':
+        return (
+          <div key={widget.id} className="bg-white rounded-lg shadow-sm overflow-hidden" style={{ 
+            width: widget.sizePreset === 'full-width' ? '100%' : `${widget.size?.width || 800}px`,
+            height: `${widget.size?.height || 600}px`,
+          }}>
+            {fileUrl ? (
+              <FileViewer
+                fileUrl={fileUrl}
+                fileType={config.taskData?.fileType}
+                metadata={config.taskData?.fileMetadata}
+                width={widget.size?.width || 800}
+                height={widget.size?.height || 600}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400">
+                <div className="text-center">
+                  <FileText size={40} className="mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No media file</p>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'TEXTAREA':
+        const textareaValue = formData[widget.id] || widget.placeholder || '';
+        return (
+          <div key={widget.id} className="bg-white rounded-lg shadow-sm p-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {widget.label}
+            </label>
+            <textarea
+              value={textareaValue}
+              onChange={(e) => setFormData({ ...formData, [widget.id]: e.target.value })}
+              placeholder={widget.placeholder}
+              rows={widget.rows || 4}
+              disabled={widget.disabled || true}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            />
+          </div>
+        );
+
+      case 'INSTRUCTION_TEXT':
+        const instruction = instructions.find(i => i.id === widget.id);
+        return instruction ? (
+          <div key={widget.id}>
+            <InstructionBanner item={instruction} />
+          </div>
+        ) : null;
+
+      case 'QUESTION':
+        // Render the question interface at this widget's position
+        return renderQuestionInterface(widget);
+
+      default:
+        return null;
+    }
+  };
+
+  // ── Question interface renderer ──
+  const renderQuestionInterface = (widget: any) => {
+    if (questions.length === 0) {
+      return (
+        <div key={widget.id} className="bg-white rounded-lg shadow-sm p-12">
+          <div className="text-center text-gray-400">
+            <FileText size={40} className="mx-auto mb-3 opacity-50" />
+            <p className="text-sm font-medium">No questions configured</p>
+            <p className="text-xs mt-1">This task has no questions to answer.</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div key={widget.id} className="bg-white rounded-lg shadow-sm">
+        {renderMode === 'paginated' ? (
+          <div className="flex flex-col">
+            {/* Progress bar */}
+            <div className="bg-white border-b border-gray-200 px-6 py-3">
+              <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
+                <span className="font-medium">
+                  Question {currentQuestionIdx + 1} of {questions.length}
+                </span>
+                <span>{Math.round(((currentQuestionIdx + 1) / questions.length) * 100)}%</span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div
+                  className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${((currentQuestionIdx + 1) / questions.length) * 100}%` }}
+                />
+              </div>
+              {/* Question navigation dots */}
+              <div className="flex gap-1.5 mt-2 flex-wrap">
+                {questions.map((q, i) => {
+                  const ps = questionPluginState[q.id];
+                  const hasFail = ps?.status === 'FAIL';
+                  const hasWarn = ps?.status === 'WARN' && !ps.acknowledged;
+                  return (
+                    <button
+                      key={q.id}
+                      onClick={() => {
+                        if (currentQuestion) runPluginsForQuestion(currentQuestion.id);
+                        setCurrentQuestionIdx(i);
+                      }}
+                      className={`w-6 h-6 rounded-full text-xs font-semibold transition-all ${
+                        i === currentQuestionIdx
+                          ? 'bg-blue-600 text-white scale-110 shadow-sm'
+                          : hasFail
+                          ? 'bg-red-500 text-white'
+                          : hasWarn
+                          ? 'bg-amber-400 text-white'
+                          : answeredQuestions.has(q.id)
+                          ? 'bg-green-500 text-white'
+                          : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+                      }`}
+                      title={`Q${i + 1}: ${q.text}`}
+                    >
+                      {i + 1}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Current question */}
+            <div className="p-6">
+              {currentQuestion && (
+                <div className="bg-gray-50 rounded-xl border border-gray-200 p-6">
+                  <div className="mb-5">
+                    <div className="flex items-start gap-2 mb-1">
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex-shrink-0 mt-0.5">
+                        {currentQuestionIdx + 1}
+                      </span>
+                      <h3 className="text-base font-semibold text-gray-900 leading-snug">
+                        {currentQuestion.text}
+                        {currentQuestion.required !== false && (
+                          <span className="text-red-500 ml-1">*</span>
+                        )}
+                      </h3>
+                    </div>
+                    {currentQuestion.description && (
+                      <p className="text-sm text-gray-500 mt-1.5 ml-8">
+                        {currentQuestion.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="ml-8">
+                    <QuestionWidget
+                      question={currentQuestion}
+                      value={currentValue}
+                      onChange={(v) => handleQuestionResponse(currentQuestion.id, v)}
+                      disabled={questionPluginState[currentQuestion.id]?.status === 'running'}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Navigation */}
+            <div className="bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between">
+              <button
+                onClick={handlePrev}
+                disabled={isFirst}
+                className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                <ChevronLeft size={18} /> Previous
+              </button>
+
+              <div className="text-sm">
+                {isCurrentAnswered ? (
+                  <span className="text-green-600 font-medium flex items-center gap-1">
+                    <CheckCircle size={14} /> Answered
+                  </span>
+                ) : currentQuestion?.required !== false ? (
+                  <span className="text-amber-600 text-xs font-medium">Required</span>
+                ) : (
+                  <span className="text-gray-400 text-xs">Optional</span>
+                )}
+              </div>
+
+              {isLast ? (
+                <button
+                  onClick={handleSubmitAnnotation}
+                  disabled={submitting}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-60 transition shadow-sm"
+                >
+                  {submitting ? (
+                    <><Loader2 className="animate-spin" size={16} /> Submitting...</>
+                  ) : (
+                    <><Send size={16} /> Submit Annotation</>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={handleNext}
+                  disabled={!canProceed}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  Next <ChevronRight size={18} />
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          // All-at-once mode
+          <div className="p-6 space-y-4">
+            {questions.map((q, i) => {
+              const qValue = formData[q.id];
+              const ps = questionPluginState[q.id];
+              return (
+                <div key={q.id} className="bg-gray-50 rounded-xl border border-gray-200 p-6">
+                  <div className="mb-5">
+                    <div className="flex items-start gap-2 mb-1">
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex-shrink-0 mt-0.5">
+                        {i + 1}
+                      </span>
+                      <h3 className="text-base font-semibold text-gray-900 leading-snug">
+                        {q.text}
+                        {q.required !== false && <span className="text-red-500 ml-1">*</span>}
+                      </h3>
+                    </div>
+                    {q.description && (
+                      <p className="text-sm text-gray-500 mt-1.5 ml-8">{q.description}</p>
+                    )}
+                  </div>
+                  <div className="ml-8">
+                    <QuestionWidget
+                      question={q}
+                      value={qValue}
+                      onChange={(v) => handleQuestionResponse(q.id, v)}
+                      disabled={ps?.status === 'running'}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+            {/* Submit button for all-at-once mode */}
+            <div className="pt-4">
+              <button
+                onClick={handleSubmitAnnotation}
+                disabled={submitting}
+                className="w-full flex items-center justify-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-60 transition shadow-sm"
+              >
+                {submitting ? (
+                  <><Loader2 className="animate-spin" size={16} /> Submitting...</>
+                ) : (
+                  <><Send size={16} /> Submit Annotation</>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ══════════════════════════════════════════════════════════════════════════
   // ANNOTATOR VIEW
   // ══════════════════════════════════════════════════════════════════════════
   if (viewType === 'annotator') {
+    const containerStyle = layout.type === 'flex-vertical'
+      ? { display: 'flex', flexDirection: 'column' as const, gap: `${layout.gap}px`, maxWidth: `${layout.maxWidth}px`, margin: '0 auto' }
+      : { display: 'grid', gridTemplateColumns: `repeat(${layout.columns}, 1fr)`, gap: `${layout.gap}px`, maxWidth: `${layout.maxWidth}px`, margin: '0 auto' };
+
     return (
       <div className="flex flex-col h-screen bg-gray-50">
         {/* Top bar */}
@@ -826,350 +1161,11 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
           </div>
         </div>
 
-        {/* Body: two-column layout */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* LEFT: Fixed media panel */}
-          <div className="w-1/2 border-r border-gray-200 bg-white flex flex-col overflow-hidden flex-shrink-0">
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-              <div className="flex items-center gap-2">
-                <FileText size={14} className="text-gray-500" />
-                <span className="text-sm font-semibold text-gray-700">Task Media</span>
-              </div>
-            </div>
-            <div className="flex-1 overflow-auto p-4">
-              {fileUrl ? (
-                <FileViewer 
-                  fileUrl={fileUrl} 
-                  metadata={config.taskData?.metadata}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-400">
-                  <div className="text-center">
-                    <FileText size={40} className="mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No media file</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* RIGHT: Sequential questions panel */}
-          <div className="w-1/2 flex flex-col overflow-hidden bg-gray-50">
-            {questions.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center text-gray-400">
-                  <FileText size={40} className="mx-auto mb-3 opacity-50" />
-                  <p className="text-sm font-medium">No questions configured</p>
-                  <p className="text-xs mt-1">This task has no questions to answer.</p>
-                </div>
-              </div>
-            ) : renderMode === 'paginated' ? (
-              <>
-                {/* Progress bar + question dots */}
-                <div className="bg-white border-b border-gray-200 px-6 py-3 flex-shrink-0">
-                  <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
-                    <span className="font-medium">
-                      Question {currentQuestionIdx + 1} of {questions.length}
-                    </span>
-                    <span>{Math.round(((currentQuestionIdx + 1) / questions.length) * 100)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div
-                      className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${((currentQuestionIdx + 1) / questions.length) * 100}%` }}
-                    />
-                  </div>
-                  {/* Clickable question dots */}
-                  <div className="flex gap-1.5 mt-2 flex-wrap">
-                    {questions.map((q, i) => {
-                      const ps = questionPluginState[q.id];
-                      const hasFail = ps?.status === 'FAIL';
-                      const hasWarn = ps?.status === 'WARN' && !ps.acknowledged;
-                      return (
-                        <button
-                          key={q.id}
-                          onClick={() => {
-                            if (currentQuestion) runPluginsForQuestion(currentQuestion.id);
-                            setCurrentQuestionIdx(i);
-                          }}
-                          className={`w-6 h-6 rounded-full text-xs font-semibold transition-all ${
-                            i === currentQuestionIdx
-                              ? 'bg-blue-600 text-white scale-110 shadow-sm'
-                              : hasFail
-                              ? 'bg-red-500 text-white'
-                              : hasWarn
-                              ? 'bg-amber-400 text-white'
-                              : answeredQuestions.has(q.id)
-                              ? 'bg-green-500 text-white'
-                              : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
-                          }`}
-                          title={`Q${i + 1}: ${q.text}`}
-                        >
-                          {i + 1}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Instructions (if any) */}
-                {instructions.length > 0 && currentQuestionIdx === 0 && (
-                  <div className="px-6 pt-4 flex-shrink-0">
-                    {instructions.map((item) => (
-                      <InstructionBanner key={item.id} item={item} />
-                    ))}
-                  </div>
-                )}
-
-                {/* Current question card */}
-                <div className="flex-1 overflow-y-auto p-6">
-                  {currentQuestion && (
-                    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                      <div className="mb-5">
-                        <div className="flex items-start gap-2 mb-1">
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex-shrink-0 mt-0.5">
-                            {currentQuestionIdx + 1}
-                          </span>
-                          <h3 className="text-base font-semibold text-gray-900 leading-snug">
-                            {currentQuestion.text}
-                            {currentQuestion.required !== false && (
-                              <span className="text-red-500 ml-1">*</span>
-                            )}
-                          </h3>
-                        </div>
-                        {currentQuestion.description && (
-                          <p className="text-sm text-gray-500 mt-1.5 ml-8">
-                            {currentQuestion.description}
-                          </p>
-                        )}
-                      </div>
-                      <div className="ml-8">
-                        <QuestionWidget
-                          question={currentQuestion}
-                          value={currentValue}
-                          onChange={(v) => handleQuestionResponse(currentQuestion.id, v)}
-                          disabled={questionPluginState[currentQuestion.id]?.status === 'running'}
-                        />
-
-                        {/* ── Inline plugin feedback ── */}
-                        {(() => {
-                          const ps = questionPluginState[currentQuestion.id];
-                          if (!ps || ps.status === 'idle') return null;
-
-                          if (ps.status === 'running') {
-                            return (
-                              <div className="mt-2 flex items-center gap-2 text-xs text-blue-600">
-                                <Loader2 size={12} className="animate-spin" />
-                                Validating...
-                              </div>
-                            );
-                          }
-                          if (ps.status === 'PASS') {
-                            return (
-                              <div className="mt-2 flex items-center gap-1 text-xs text-green-600">
-                                <CheckCircle size={12} /> Validation passed
-                              </div>
-                            );
-                          }
-                          if (ps.status === 'WARN') {
-                            return (
-                              <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-                                <div className="flex items-center gap-1 font-semibold mb-1">
-                                  <AlertTriangle size={12} /> Warning
-                                </div>
-                                <p>{ps.message}</p>
-                                {!ps.acknowledged && (
-                                  <button
-                                    onClick={() => setQuestionPluginState((prev) => ({
-                                      ...prev,
-                                      [currentQuestion.id]: { ...prev[currentQuestion.id], acknowledged: true },
-                                    }))}
-                                    className="mt-2 px-3 py-1 bg-amber-600 text-white rounded-md text-xs font-medium hover:bg-amber-700"
-                                  >
-                                    Acknowledge
-                                  </button>
-                                )}
-                                {ps.acknowledged && (
-                                  <span className="mt-1 inline-flex items-center gap-1 text-amber-700"><CheckCircle size={10} /> Acknowledged</span>
-                                )}
-                              </div>
-                            );
-                          }
-                          if (ps.status === 'FAIL') {
-                            if (ps.behavior === 'HARD_BLOCK') {
-                              return (
-                                <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800">
-                                  <div className="flex items-center gap-1 font-semibold mb-1">
-                                    <XCircle size={12} /> Validation Failed — Answer Cleared
-                                  </div>
-                                  <p>{ps.message || 'Please correct your answer.'}</p>
-                                </div>
-                              );
-                            }
-                            if (ps.behavior === 'SOFT_WARN') {
-                              return (
-                                <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800 space-y-2">
-                                  <div className="flex items-center gap-1 font-semibold">
-                                    <XCircle size={12} /> Failed
-                                  </div>
-                                  <p>{ps.message}</p>
-                                  <div>
-                                    <label className="block font-medium mb-1">Override reason (required to submit):</label>
-                                    <textarea
-                                      rows={2}
-                                      value={ps.overrideReason ?? ''}
-                                      onChange={(e) => setQuestionPluginState((prev) => ({
-                                        ...prev,
-                                        [currentQuestion.id]: { ...prev[currentQuestion.id], overrideReason: e.target.value },
-                                      }))}
-                                      className="w-full border border-red-300 rounded-md px-2 py-1 text-xs text-gray-800 focus:ring-1 focus:ring-red-400 resize-none"
-                                      placeholder="Explain why you are overriding this validation..."
-                                    />
-                                  </div>
-                                </div>
-                              );
-                            }
-                            // ADVISORY
-                            return (
-                              <div className="mt-2 flex items-start gap-1 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg p-2">
-                                <AlertTriangle size={12} className="mt-0.5 flex-shrink-0" />
-                                <span>{ps.message || 'Validation advisory.'}</span>
-                              </div>
-                            );
-                          }
-                          // ERROR / TIMEOUT
-                          return (
-                            <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
-                              <AlertCircle size={12} /> {ps.message || 'Validation unavailable'}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Navigation footer */}
-                <div className="bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
-                  <button
-                    onClick={handlePrev}
-                    disabled={isFirst}
-                    className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                  >
-                    <ChevronLeft size={18} /> Previous
-                  </button>
-
-                  <div className="text-sm">
-                    {isCurrentAnswered ? (
-                      <span className="text-green-600 font-medium flex items-center gap-1">
-                        <CheckCircle size={14} /> Answered
-                      </span>
-                    ) : currentQuestion?.required !== false ? (
-                      <span className="text-amber-600 text-xs font-medium">Required</span>
-                    ) : (
-                      <span className="text-gray-400 text-xs">Optional</span>
-                    )}
-                  </div>
-
-                  {isLast ? (
-                    <button
-                      onClick={handleSubmitAnnotation}
-                      disabled={submitting}
-                      className="flex items-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-60 transition shadow-sm"
-                    >
-                      {submitting ? (
-                        <><Loader2 className="animate-spin" size={16} /> Submitting...</>
-                      ) : (
-                        <><Send size={16} /> Submit Annotation</>
-                      )}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleNext}
-                      disabled={!canProceed}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                    >
-                      Next <ChevronRight size={18} />
-                    </button>
-                  )}
-                </div>
-              </>
-            ) : (
-              /* ── All-at-once mode ── */
-              <>
-                {/* Progress summary */}
-                <div className="bg-white border-b border-gray-200 px-6 py-3 flex-shrink-0">
-                  <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
-                    <span className="font-medium">All Questions</span>
-                    <span>{answeredQuestions.size}/{questions.length} answered</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div
-                      className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${questions.length > 0 ? (answeredQuestions.size / questions.length) * 100 : 0}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Instructions (if any) */}
-                {instructions.length > 0 && (
-                  <div className="px-6 pt-4 flex-shrink-0">
-                    {instructions.map((item) => (
-                      <InstructionBanner key={item.id} item={item} />
-                    ))}
-                  </div>
-                )}
-
-                {/* All question cards */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                  {questions.map((q, i) => {
-                    const qValue = formData[q.id];
-                    const ps = questionPluginState[q.id];
-                    return (
-                      <div key={q.id} className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                        <div className="mb-5">
-                          <div className="flex items-start gap-2 mb-1">
-                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex-shrink-0 mt-0.5">
-                              {i + 1}
-                            </span>
-                            <h3 className="text-base font-semibold text-gray-900 leading-snug">
-                              {q.text}
-                              {q.required !== false && <span className="text-red-500 ml-1">*</span>}
-                            </h3>
-                          </div>
-                          {q.description && (
-                            <p className="text-sm text-gray-500 mt-1.5 ml-8">{q.description}</p>
-                          )}
-                        </div>
-                        <div className="ml-8">
-                          <QuestionWidget
-                            question={q}
-                            value={qValue}
-                            onChange={(v) => handleQuestionResponse(q.id, v)}
-                            disabled={ps?.status === 'running'}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Submit footer */}
-                <div className="bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-end flex-shrink-0">
-                  <button
-                    onClick={handleSubmitAnnotation}
-                    disabled={submitting}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-60 transition shadow-sm"
-                  >
-                    {submitting ? (
-                      <><Loader2 className="animate-spin" size={16} /> Submitting...</>
-                    ) : (
-                      <><Send size={16} /> Submit Annotation</>
-                    )}
-                  </button>
-                </div>
-              </>
-            )}
+        {/* Dynamic layout based on configuration */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <div style={containerStyle}>
+            {/* Render all widgets in order (including QUESTION widget at its position) */}
+            {visibleWidgets.map(widget => renderWidgetByType(widget))}
           </div>
         </div>
       </div>
@@ -1218,7 +1214,8 @@ export const UnifiedTaskRenderer: React.FC<UnifiedTaskRendererProps> = ({
             {fileUrl ? (
               <FileViewer 
                 fileUrl={fileUrl} 
-                metadata={config.taskData?.metadata}
+                fileType={config.taskData?.fileType}
+                metadata={config.taskData?.fileMetadata}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-gray-400">

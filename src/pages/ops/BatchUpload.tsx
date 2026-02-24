@@ -63,7 +63,8 @@ export const BatchUpload = () => {
   const loadProjects = async () => {
     setProjectsLoading(true);
     try {
-      const response = await projectService.fetchProjects({ status: 'ACTIVE' as any });
+      // Fetch all projects (user can see all statuses, not just active)
+      const response = await projectService.fetchProjects({ limit: 1000 });
       setProjects(response.data || []);
     } catch (error: any) {
       console.error('Failed to load projects:', error);
@@ -546,7 +547,7 @@ export const BatchUpload = () => {
                     <option value="">Select project...</option>
                     {projects.map((project) => (
                       <option key={project.id} value={project.id}>
-                        {project.name}
+                        {project.name} ({project.status})
                       </option>
                     ))}
                   </select>
@@ -738,7 +739,7 @@ sample_text1.txt,TEXT,http://localhost:3004/api/v1/media/sample_text1.txt,txt_00
                   <option value="">Select a project...</option>
                   {projects.map((project) => (
                     <option key={project.id} value={project.id}>
-                      {project.name}
+                      {project.name} ({project.status})
                     </option>
                   ))}
                 </select>

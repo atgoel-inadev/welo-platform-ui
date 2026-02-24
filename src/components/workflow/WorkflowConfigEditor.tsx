@@ -160,25 +160,21 @@ export const WorkflowConfigEditor = ({ config, onChange, readOnly = false }: Wor
                       />
 
                       <FormInput
-                        label="Number of Annotators"
+                        label={`Number of ${stage.type === 'ANNOTATION' ? 'Annotators' : 'Reviewers'}`}
                         type="number"
-                        min="0"
+                        min="1"
                         max="10"
-                        value={stage.annotators_count}
-                        onChange={(e) => updateStage(index, { annotators_count: parseInt(e.target.value) || 0 })}
+                        value={stage.type === 'ANNOTATION' ? stage.annotators_count : stage.reviewers_count}
+                        onChange={(e) => {
+                          const count = parseInt(e.target.value) || 1;
+                          if (stage.type === 'ANNOTATION') {
+                            updateStage(index, { annotators_count: count, reviewers_count: 0 });
+                          } else {
+                            updateStage(index, { reviewers_count: count, annotators_count: 0 });
+                          }
+                        }}
                         disabled={readOnly}
-                        helperText="0 if this is a review-only stage"
-                      />
-
-                      <FormInput
-                        label="Number of Reviewers"
-                        type="number"
-                        min="0"
-                        max="10"
-                        value={stage.reviewers_count}
-                        onChange={(e) => updateStage(index, { reviewers_count: parseInt(e.target.value) || 0 })}
-                        disabled={readOnly}
-                        helperText="0 if no review needed"
+                        helperText={`Task owners for this ${stage.type.toLowerCase()} stage`}
                       />
 
                       <FormInput
@@ -192,7 +188,8 @@ export const WorkflowConfigEditor = ({ config, onChange, readOnly = false }: Wor
                         helperText="Before reassignment"
                       />
 
-                      {stage.annotators_count > 1 && (
+                      {((stage.type === 'ANNOTATION' && stage.annotators_count > 1) || 
+                        (stage.type !== 'ANNOTATION' && stage.reviewers_count > 1)) && (
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             Consensus Threshold
@@ -222,10 +219,13 @@ export const WorkflowConfigEditor = ({ config, onChange, readOnly = false }: Wor
                           type="checkbox"
                           checked={stage.require_consensus}
                           onChange={(e) => updateStage(index, { require_consensus: e.target.checked })}
-                          disabled={readOnly || stage.annotators_count <= 1}
+                          disabled={readOnly || 
+                            (stage.type === 'ANNOTATION' ? stage.annotators_count <= 1 : stage.reviewers_count <= 1)}
                           className="w-4 h-4 text-blue-600 rounded"
                         />
-                        <span className="text-sm text-gray-700">Require consensus between annotators</span>
+                        <span className="text-sm text-gray-700">
+                          Require consensus between {stage.type === 'ANNOTATION' ? 'annotators' : 'reviewers'}
+                        </span>
                       </label>
 
                       <label className="flex items-center gap-2 cursor-pointer">

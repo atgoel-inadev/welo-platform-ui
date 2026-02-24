@@ -6,7 +6,7 @@ import { fetchCustomers } from '../../store/customersSlice';
 import { createProject } from '../../store/projectsSlice';
 import { Button, FormInput, FormTextarea, FormSelect } from '../../components/common';
 import { WorkflowConfigEditor, type ExtendedWorkflowConfiguration } from '../../components/workflow';
-import { ProjectType, AnnotationQuestion, QuestionType, ReviewLevel } from '../../types';
+import { ProjectType, AnnotationQuestion, QuestionType } from '../../types';
 
 interface FormData {
   name: string;
@@ -453,29 +453,41 @@ export const CreateProject = () => {
                   <h3 className="font-medium text-gray-900 mb-2">Workflow Configuration</h3>
                   <dl className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <dt className="text-gray-600">Multi-Annotator:</dt>
-                      <dd className="font-medium">{formData.enable_multi_annotator ? 'Enabled' : 'Disabled'}</dd>
+                      <dt className="text-gray-600">Workflow Stages:</dt>
+                      <dd className="font-medium">{formData.workflow_config.stages?.length || 0}</dd>
                     </div>
-                    {formData.enable_multi_annotator && (
-                      <>
-                        <div className="flex justify-between">
-                          <dt className="text-gray-600">Annotators Per Task:</dt>
-                          <dd className="font-medium">{formData.annotators_per_task}</dd>
-                        </div>
-                        <div className="flex justify-between">
-                          <dt className="text-gray-600">Consensus Threshold:</dt>
-                          <dd className="font-medium">{Math.round(formData.consensus_threshold * 100)}%</dd>
-                        </div>
-                      </>
+                    {formData.workflow_config.stages && formData.workflow_config.stages.length > 0 && (
+                      <div className="mt-2 space-y-1 pl-4">
+                        {formData.workflow_config.stages.map((stage, idx) => (
+                          <div key={stage.id} className="text-sm flex items-start gap-2">
+                            <span className="text-gray-600">{idx + 1}.</span>
+                            <div>
+                              <span className="font-medium">{stage.name}</span>
+                              <span className="text-gray-500"> ({stage.type})</span>
+                              <span className="text-gray-600"> - {
+                                stage.type === 'ANNOTATION' 
+                                  ? `${stage.annotators_count} annotator${stage.annotators_count !== 1 ? 's' : ''}`
+                                  : `${stage.reviewers_count} reviewer${stage.reviewers_count !== 1 ? 's' : ''}`
+                              }</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                     <div className="flex justify-between">
                       <dt className="text-gray-600">Queue Strategy:</dt>
-                      <dd className="font-medium">{formData.queue_strategy}</dd>
+                      <dd className="font-medium">{formData.workflow_config.queue_strategy}</dd>
                     </div>
                     <div className="flex justify-between">
-                      <dt className="text-gray-600">Review Levels:</dt>
-                      <dd className="font-medium">{formData.review_levels.length}</dd>
+                      <dt className="text-gray-600">Max Tasks Per User:</dt>
+                      <dd className="font-medium">{formData.workflow_config.max_tasks_per_annotator}</dd>
                     </div>
+                    {formData.workflow_config.enable_quality_gates && (
+                      <div className="flex justify-between">
+                        <dt className="text-gray-600">Quality Gate Threshold:</dt>
+                        <dd className="font-medium">{Math.round(formData.workflow_config.minimum_quality_score * 100)}%</dd>
+                      </div>
+                    )}
                   </dl>
                 </div>
 

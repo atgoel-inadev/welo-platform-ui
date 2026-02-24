@@ -1,4 +1,4 @@
-import { Sprite, Texture, Graphics, Text as PixiText, TextStyle, Container } from 'pixi.js';
+import { Sprite, Texture, Graphics, Text as PixiText, TextStyle, Container, Assets } from 'pixi.js';
 import { BaseRenderer } from './BaseRenderer';
 import { FileMetadata, RendererConfig, ZoomPanState } from '../types/renderer';
 
@@ -8,12 +8,20 @@ export class ImageRenderer extends BaseRenderer {
   private zoomPanState: ZoomPanState;
   private isDragging: boolean;
   private dragStart: { x: number; y: number };
+  private interactionSetup: boolean;
+  
+  // Bound event handlers for proper cleanup
+  private boundHandleWheel: (e: WheelEvent) => void;
+  private boundHandleMouseDown: (e: MouseEvent) => void;
+  private boundHandleMouseMove: (e: MouseEvent) => void;
+  private boundHandleMouseUp: (e: MouseEvent) => void;
 
   constructor(container: HTMLElement, config: RendererConfig) {
     super(container, config);
     this.imageSprite = null;
     this.isDragging = false;
     this.dragStart = { x: 0, y: 0 };
+    this.interactionSetup = false;
 
     this.zoomPanState = {
       scale: 1,
@@ -23,16 +31,20 @@ export class ImageRenderer extends BaseRenderer {
 
     this.imageContainer = new Container();
     this.app.stage.addChild(this.imageContainer);
-
-    this.setupInteraction();
+    
+    // Bind event handlers once
+    this.boundHandleWheel = this.handleWheel.bind(this);
+    this.boundHandleMouseDown = this.handleMouseDown.bind(this);
+    this.boundHandleMouseMove = this.handleMouseMove.bind(this);
+    this.boundHandleMouseUp = this.handleMouseUp.bind(this);
   }
 
   private setupInteraction(): void {
-    this.app.canvas.addEventListener('wheel', this.handleWheel.bind(this));
-    this.app.canvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
-    this.app.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
-    this.app.canvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
-    this.app.canvas.addEventListener('mouseleave', this.handleMouseUp.bind(this));
+    this.app.canvas.addEventListener('wheel', this.boundHandleWheel);
+    this.app.canvas.addEventListener('mousedown', this.boundHandleMouseDown);
+    this.app.canvas.addEventListener('mousemove', this.boundHandleMouseMove);
+    this.app.canvas.addEventListener('mouseup', this.boundHandleMouseUp);
+    this.app.canvas.addEventListener('mouseleave', this.boundHandleMouseUp);
   }
 
   private handleWheel(event: WheelEvent): void {
@@ -88,10 +100,26 @@ export class ImageRenderer extends BaseRenderer {
 
   async load(file: FileMetadata): Promise<void> {
     await this.waitForAppReady();
+    
+    // Setup interaction only once
+    if (!this.interactionSetup) {
+      this.setupInteraction();
+      this.interactionSetup = true;
+    }
+    
     this.currentFile = file;
 
     try {
-      const texture = await Texture.from(file.url);
+      console.log('ImageRenderer: Loading texture from URL:', file.url);
+      
+      // Load texture using Assets API (proper way for remote URLs in PixiJS v8)
+      const texture = await Assets.load(file.url);
+      
+      console.log('ImageRenderer: Texture loaded successfully', {
+        width: texture.width,
+        height: texture.height,
+        valid: texture.valid
+      });
 
       if (this.imageSprite) {
         this.imageContainer.removeChild(this.imageSprite);
@@ -110,8 +138,11 @@ export class ImageRenderer extends BaseRenderer {
       this.imageContainer.addChild(this.imageSprite);
       this.updateTransform();
       this.app.canvas.style.cursor = 'grab';
+      
+      console.log('ImageRenderer: Image displayed successfully');
     } catch (error) {
-      console.error('Failed to load image:', error);
+      console.error('ImageRenderer: Failed to load image:', error);
+      throw error; // Re-throw so FileViewer can show error state
     }
   }
 
@@ -180,11 +211,14 @@ export class ImageRenderer extends BaseRenderer {
   }
 
   destroy(): void {
-    this.app.canvas.removeEventListener('wheel', this.handleWheel.bind(this));
-    this.app.canvas.removeEventListener('mousedown', this.handleMouseDown.bind(this));
-    this.app.canvas.removeEventListener('mousemove', this.handleMouseMove.bind(this));
-    this.app.canvas.removeEventListener('mouseup', this.handleMouseUp.bind(this));
-    this.app.canvas.removeEventListener('mouseleave', this.handleMouseUp.bind(this));
+    // Remove event listeners only if interaction was set up and canvas exists
+    if (this.interactionSetup && this.app && this.app.canvas) {
+      this.app.canvas.removeEventListener('wheel', this.boundHandleWheel);
+      this.app.canvas.removeEventListener('mousedown', this.boundHandleMouseDown);
+      this.app.canvas.removeEventListener('mousemove', this.boundHandleMouseMove);
+      this.app.canvas.removeEventListener('mouseup', this.boundHandleMouseUp);
+      this.app.canvas.removeEventListener('mouseleave', this.boundHandleMouseUp);
+    }
     super.destroy();
   }
 }

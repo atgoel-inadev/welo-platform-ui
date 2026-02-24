@@ -21,9 +21,10 @@ export const ProjectTeamAssignment: React.FC<ProjectTeamAssignmentProps> = ({
 
   // Assignment form
   const [showAssignForm, setShowAssignForm] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.ANNOTATOR);
   const [quota, setQuota] = useState(10);
+  const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
     loadTeamMembers();
@@ -56,24 +57,27 @@ export const ProjectTeamAssignment: React.FC<ProjectTeamAssignmentProps> = ({
   };
 
   const handleAssignUser = async () => {
-    if (!selectedUserId) {
-      setError('Please select a user');
+    if (selectedUserIds.length === 0) {
+      setError('Please select at least one user');
       return;
     }
 
     setError('');
     setSuccess('');
+    setAssigning(true);
 
     try {
-      const dto: AssignUserToProjectDto = {
-        userId: selectedUserId,
+      const assignments: AssignUserToProjectDto[] = selectedUserIds.map(userId => ({
+        userId,
         projectId,
         role: selectedRole,
         quota,
-      };
+      }));
 
-      await userService.assignUserToProject(dto);
-      setSuccess('User assigned to project successfully!');
+      await userService.assignUsersToProject(assignments);
+      
+      const count = selectedUserIds.length;
+      setSuccess(`${count} user${count > 1 ? 's' : ''} assigned to project successfully!`);
       setShowAssignForm(false);
       resetForm();
       loadTeamMembers();
@@ -84,7 +88,9 @@ export const ProjectTeamAssignment: React.FC<ProjectTeamAssignmentProps> = ({
 
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
-      setError(err.message || 'Failed to assign user to project');
+      setError(err.message || 'Failed to assign users to project');
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -120,9 +126,26 @@ export const ProjectTeamAssignment: React.FC<ProjectTeamAssignmentProps> = ({
   };
 
   const resetForm = () => {
-    setSelectedUserId('');
+    setSelectedUserIds([]);
     setSelectedRole(UserRole.ANNOTATOR);
     setQuota(10);
+  };
+
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUserIds(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    const availableUsers = getAvailableUsers();
+    if (selectedUserIds.length === availableUsers.length) {
+      setSelectedUserIds([]);
+    } else {
+      setSelectedUserIds(availableUsers.map(u => u.id));
+    }
   };
 
   const getAvailableUsers = (): User[] => {
@@ -161,7 +184,7 @@ export const ProjectTeamAssignment: React.FC<ProjectTeamAssignmentProps> = ({
           className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           <UserPlus className="w-5 h-5 mr-2" />
-          Assign User
+          Assign Users
         </button>
       </div>
 
@@ -183,60 +206,88 @@ export const ProjectTeamAssignment: React.FC<ProjectTeamAssignmentProps> = ({
       {/* Assignment Form */}
       {showAssignForm && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold mb-4">Assign User to Project</h3>
+          <h3 className="text-lg font-semibold mb-4">Assign Users to Project</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Role *
-              </label>
-              <select
-                value={selectedRole}
-                onChange={(e) => {
-                  setSelectedRole(e.target.value as UserRole);
-                  setSelectedUserId('');
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value={UserRole.ANNOTATOR}>Annotator</option>
-                <option value={UserRole.REVIEWER}>Reviewer</option>
-              </select>
+          <div className="grid grid-cols-1 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Role *
+                </label>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => {
+                    setSelectedRole(e.target.value as UserRole);
+                    setSelectedUserIds([]);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value={UserRole.ANNOTATOR}>Annotator</option>
+                  <option value={UserRole.REVIEWER}>Reviewer</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Max Tasks Quota
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={quota}
+                  onChange={(e) => setQuota(parseInt(e.target.value) || 10)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                User *
-              </label>
-              <select
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Select a user...</option>
-                {getAvailableUsers().map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.name} ({user.email})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Max Tasks Quota
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="1000"
-                value={quota}
-                onChange={(e) => setQuota(parseInt(e.target.value) || 10)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+            <div className="md:col-span-2">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Select Users * ({selectedUserIds.length} selected)
+                </label>
+                {getAvailableUsers().length > 0 && (
+                  <button
+                    type="button"
+                    onClick={toggleSelectAll}
+                    className="text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    {selectedUserIds.length === getAvailableUsers().length ? 'Deselect All' : 'Select All'}
+                  </button>
+                )}
+              </div>
+              <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto">
+                {getAvailableUsers().length === 0 ? (
+                  <div className="p-4 text-center text-gray-500 text-sm">
+                    No available {selectedRole.toLowerCase()}s to assign
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-200">
+                    {getAvailableUsers().map((user) => (
+                      <label
+                        key={user.id}
+                        className="flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedUserIds.includes(user.id)}
+                          onChange={() => toggleUserSelection(user.id)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                        />
+                        <div className="ml-3 flex-1">
+                          <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                          <div className="text-xs text-gray-500">{user.email}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="flex justify-end space-x-3 mt-4">
+          <div className="flex justify-end space-x-3 mt-6">
             <button
               onClick={() => {
                 setShowAssignForm(false);
@@ -249,10 +300,17 @@ export const ProjectTeamAssignment: React.FC<ProjectTeamAssignmentProps> = ({
             </button>
             <button
               onClick={handleAssignUser}
-              disabled={!selectedUserId}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              disabled={selectedUserIds.length === 0 || assigning}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
             >
-              Assign to Project
+              {assigning ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Assigning...
+                </>
+              ) : (
+                `Assign ${selectedUserIds.length > 0 ? `${selectedUserIds.length} User${selectedUserIds.length > 1 ? 's' : ''}` : 'to Project'}`
+              )}
             </button>
           </div>
         </div>

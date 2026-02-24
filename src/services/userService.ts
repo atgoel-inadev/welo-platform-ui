@@ -157,6 +157,15 @@ class UserService {
   }
 
   /**
+   * Assign multiple users to project in bulk
+   * This delegates to projectService for consistency
+   */
+  async assignUsersToProject(assignments: AssignUserToProjectDto[]): Promise<any> {
+    const { projectService } = await import('./projectService');
+    return projectService.assignUsersToProject(assignments);
+  }
+
+  /**
    * Remove user from project
    */
   async removeUserFromProject(projectId: string, userId: string): Promise<void> {

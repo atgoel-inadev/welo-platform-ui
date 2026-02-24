@@ -53,7 +53,7 @@ export interface CreateProjectDto {
   endDate?: Date;
   annotationSchema?: any;
   qualityThresholds?: any;
-  workflowRules?: any;
+  workflow_config?: any; // Changed from workflowRules to match backend
   uiConfiguration?: any;
   supportedFileTypes?: string[];
 }
@@ -182,10 +182,10 @@ function mapAnnotationQuestionsToBackend(questions: AnnotationQuestion[]): any[]
 /**
  * Maps frontend workflow config back to backend format
  */
-function mapWorkflowConfigToBackend(wf: WorkflowConfiguration): any {
-  return {
+function mapWorkflowConfigToBackend(wf: any): any {
+  const result: any = {
     annotatorsPerTask: wf.annotators_per_task,
-    reviewLevels: wf.review_levels.map((rl) => ({
+    reviewLevels: wf.review_levels?.map((rl: any) => ({
       level: rl.level,
       name: rl.name,
       reviewersCount: rl.reviewers_count,
@@ -193,7 +193,7 @@ function mapWorkflowConfigToBackend(wf: WorkflowConfiguration): any {
       approvalThreshold: rl.approval_threshold,
       autoAssign: rl.auto_assign,
       allowedReviewers: rl.allowed_reviewers,
-    })),
+    })) || [],
     approvalCriteria: {
       requireAllAnnotatorConsensus: wf.enable_multi_annotator,
       consensusThreshold: wf.consensus_threshold,
@@ -205,6 +205,27 @@ function mapWorkflowConfigToBackend(wf: WorkflowConfiguration): any {
       assignmentTimeout: wf.assignment_expiration_hours * 60,
     },
   };
+
+  // Map stages if present (new extended workflow config)
+  if (wf.stages && wf.stages.length > 0) {
+    result.stages = wf.stages.map((stage: any) => ({
+      id: stage.id,
+      name: stage.name,
+      type: stage.type.toLowerCase(), // Convert ANNOTATION -> annotation for backend
+      annotators_count: stage.annotators_count || 0,
+      reviewers_count: stage.reviewers_count || 0,
+      max_rework_attempts: stage.max_rework_attempts,
+      require_consensus: stage.require_consensus,
+      consensus_threshold: stage.consensus_threshold,
+      auto_assign: stage.auto_assign,
+      allowed_users: stage.allowed_users || [],
+    }));
+    result.global_max_rework_before_reassignment = wf.global_max_rework_before_reassignment;
+    result.enable_quality_gates = wf.enable_quality_gates;
+    result.minimum_quality_score = wf.minimum_quality_score;
+  }
+
+  return result;
 }
 
 /**
@@ -233,11 +254,15 @@ export class ProjectService {
   async fetchProjects(params: ProjectQueryParams = {}): Promise<PaginatedResponse<Project>> {
     const queryParams = new URLSearchParams();
 
+    // Always send pagination parameters with defaults
+    const page = params.page || 1;
+    const limit = params.limit || 10;
+
     if (params.customerId) queryParams.append('customerId', params.customerId);
     if (params.status) queryParams.append('status', params.status);
     if (params.search) queryParams.append('search', params.search);
-    if (params.page) queryParams.append('page', params.page.toString());
-    if (params.limit) queryParams.append('pageSize', params.limit.toString());
+    queryParams.append('page', page.toString());
+    queryParams.append('pageSize', limit.toString());
 
     const url = `/projects?${queryParams.toString()}`;
     const response = await projectManagementApi.get<BackendResponse<any[]>>(url);
@@ -274,7 +299,7 @@ export class ProjectService {
       qualityThresholds: {
         qualityThreshold: input.quality_threshold ?? 0.8,
       },
-      workflowRules: input.workflow_config
+      workflow_config: input.workflow_config
         ? mapWorkflowConfigToBackend(input.workflow_config)
         : {},
       uiConfiguration: {},
@@ -309,6 +334,17 @@ export class ProjectService {
     };
 
     const response = await projectManagementApi.patch<BackendResponse<any>>(`/projects/${id}`, dto);
+    return mapBackendProject(response.data);
+  }
+
+  /**
+   * Update project status (dedicated endpoint)
+   */
+  async updateProjectStatus(projectId: string, status: ProjectStatus): Promise<Project> {
+    const response = await projectManagementApi.patch<BackendResponse<any>>(
+      `/projects/${projectId}/status`,
+      { status }
+    );
     return mapBackendProject(response.data);
   }
 
@@ -396,6 +432,34 @@ export class ProjectService {
       body,
     );
     return response.data;
+  }
+
+  /**
+   * Assign multiple users to project in bulk
+   */
+  async assignUsersToProject(assignments: Array<{
+    projectId: string;
+    userId: string;
+    role: string;
+    quota?: number;
+  }>): Promise<any> {
+    // Execute assignments in parallel for better performance
+    const results = await Promise.allSettled(
+      assignments.map(data => this.assignUserToProject(data))
+    );
+
+    // Check for failures
+    const failures = results.filter(r => r.status === 'rejected');
+    if (failures.length > 0) {
+      const failureMessages = failures
+        .map((r: any) => r.reason?.message || 'Unknown error')
+        .join(', ');
+      throw new Error(
+        `Failed to assign ${failures.length} of ${assignments.length} users: ${failureMessages}`
+      );
+    }
+
+    return results.map((r: any) => r.value);
   }
 
   /**

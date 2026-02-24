@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { batchService, Batch, BatchStatistics, Task } from '../../services/batchService';
 import { userService } from '../../services/userService';
+import { projectService } from '../../services/projectService';
 import { User } from '../../services/authService';
 
 type AssignmentMethod = 'AUTO_ROUND_ROBIN' | 'AUTO_WORKLOAD_BASED' | 'AUTO_SKILL_BASED';
@@ -49,9 +50,15 @@ export const BatchDetails = () => {
   useEffect(() => {
     if (id) {
       loadBatchData();
-      loadAvailableAnnotators();
     }
   }, [id]);
+
+  // Load team members after batch data is loaded (need projectId)
+  useEffect(() => {
+    if (batch) {
+      loadAvailableAnnotators();
+    }
+  }, [batch]);
 
   const loadBatchData = async () => {
     if (!id) return;
@@ -77,11 +84,23 @@ export const BatchDetails = () => {
   };
 
   const loadAvailableAnnotators = async () => {
+    if (!batch?.projectId) return;
+    
     try {
-      const annotators = await userService.getAvailableAnnotators();
-      setAvailableAnnotators(annotators);
+      // Load project team members (both annotators and reviewers)
+      const teamMembers = await projectService.getProjectTeam(batch.projectId);
+      
+      // Extract users from team members and filter to annotators/reviewers
+      const users = teamMembers
+        .filter(member => 
+          (member.role === 'ANNOTATOR' || member.role === 'REVIEWER') && 
+          member.user
+        )
+        .map(member => member.user);
+      
+      setAvailableAnnotators(users);
     } catch (err: any) {
-      console.error('Failed to load annotators:', err);
+      console.error('Failed to load project team members:', err);
     }
   };
 

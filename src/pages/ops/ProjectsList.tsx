@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, Edit, Trash2, Copy, Eye } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks/useRedux';
 import { fetchProjects, deleteProject, cloneProject } from '../../store/projectsSlice';
+import { projectService } from '../../services/projectService';
 import { Button, Badge, Modal } from '../../components/common';
 import { ProjectStatus } from '../../types';
 
@@ -17,10 +18,12 @@ export const ProjectsList = () => {
   const [cloneModalOpen, setCloneModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [cloneName, setCloneName] = useState('');
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    dispatch(fetchProjects({ page, limit, search, status: statusFilter || undefined }));
-  }, [dispatch, page, limit]);
+    // Initial load - only run once on mount
+    dispatch(fetchProjects({ page: 1, limit: 10, search: '', status: undefined }));
+  }, [dispatch]);
 
   const handleSearch = () => {
     dispatch(fetchProjects({ page: 1, limit, search, status: statusFilter || undefined }));
@@ -40,6 +43,20 @@ export const ProjectsList = () => {
       setCloneModalOpen(false);
       setSelectedProject(null);
       setCloneName('');
+    }
+  };
+
+  const handleStatusChange = async (projectId: string, newStatus: ProjectStatus) => {
+    setUpdatingStatus(projectId);
+    try {
+      await projectService.updateProjectStatus(projectId, newStatus);
+      // Refresh the list
+      dispatch(fetchProjects({ page, limit, search, status: statusFilter || undefined }));
+    } catch (error) {
+      console.error('Failed to update project status:', error);
+      alert('Failed to update project status');
+    } finally {
+      setUpdatingStatus(null);
     }
   };
 
@@ -155,9 +172,24 @@ export const ProjectsList = () => {
                       <div className="text-sm text-gray-900">{project.project_type?.replace(/_/g, ' ') || 'N/A'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge variant={getStatusBadgeVariant(project.status)}>
-                        {project.status}
-                      </Badge>
+                      <select
+                        value={project.status}
+                        onChange={(e) => handleStatusChange(project.id, e.target.value as ProjectStatus)}
+                        disabled={updatingStatus === project.id}
+                        className={`text-sm border rounded px-2 py-1 ${
+                          project.status === 'ACTIVE' ? 'bg-green-50 border-green-300 text-green-800' :
+                          project.status === 'DRAFT' ? 'bg-yellow-50 border-yellow-300 text-yellow-800' :
+                          project.status === 'COMPLETED' ? 'bg-blue-50 border-blue-300 text-blue-800' :
+                          project.status === 'PAUSED' ? 'bg-gray-50 border-gray-300 text-gray-800' :
+                          'bg-gray-50 border-gray-300 text-gray-800'
+                        } ${updatingStatus === project.id ? 'opacity-50 cursor-wait' : 'cursor-pointer hover:opacity-80'}`}
+                      >
+                        <option value="DRAFT">Draft</option>
+                        <option value="ACTIVE">Active</option>
+                        <option value="PAUSED">Paused</option>
+                        <option value="COMPLETED">Completed</option>
+                        <option value="ARCHIVED">Archived</option>
+                      </select>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(project.created_at).toLocaleDateString()}

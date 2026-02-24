@@ -56,11 +56,20 @@ export abstract class BaseRenderer implements IBaseRenderer {
   }
 
   destroy(): void {
-    if (this.app) {
-      this.app.destroy(true, { children: true, texture: true, textureSource: true });
-      if (this.app.canvas && this.container && this.container.contains(this.app.canvas)) {
-        this.container.removeChild(this.app.canvas);
+    try {
+      if (this.app) {
+        // Check if app is fully initialized before destroying
+        if (this.app.renderer) {
+          this.app.destroy(true, { children: true, texture: true, textureSource: true });
+        }
+        // Only remove canvas if it exists and is attached
+        if (this.app.canvas && this.container && this.container.contains(this.app.canvas)) {
+          this.container.removeChild(this.app.canvas);
+        }
       }
+    } catch (err) {
+      // Silently handle destruction errors to prevent crashes
+      console.warn('Renderer destruction warning:', err);
     }
   }
 

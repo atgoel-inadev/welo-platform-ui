@@ -93,7 +93,8 @@ const ProjectSelector: React.FC<{ onSelect: (p: Project) => void }> = ({ onSelec
   useEffect(() => {
     (async () => {
       try {
-        const resp = await projectService.fetchProjects({ limit: 200 });
+        // Fetch all projects for dropdown (no pagination needed)
+        const resp = await projectService.fetchProjects({ limit: 1000 });
         setProjects(resp.data);
       } catch (err) {
         console.error('Failed to load projects', err);
