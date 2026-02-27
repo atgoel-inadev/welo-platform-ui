@@ -1,0 +1,18 @@
+Sample Product Review - Text Annotation Task
+
+Customer Review:
+"I recently purchased this product and have mixed feelings about it. While the build quality is excellent and it looks great, I'm disappointed with the battery life. It only lasts about 3 hours on a full charge, which is much less than advertised. The customer support team was helpful when I reached out, but they couldn't resolve the battery issue. Overall, it's an average product that doesn't quite meet the price point."
+
+Reviewer Details:
+- Purchase Date: January 15, 2026
+- Product: SmartDevice Pro X
+- Rating: 3/5 stars
+- Verified Purchase: Yes
+
+Annotation Task:
+Please identify:
+1. Positive aspects mentioned
+2. Negative aspects mentioned
+3. Overall sentiment
+4. Key pain points
+5. Would recommend? (Yes/No/Maybe)
